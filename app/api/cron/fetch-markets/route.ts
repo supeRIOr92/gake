@@ -16,7 +16,6 @@ interface PolymarketEvent {
 }
 
 function parseCityAndDate(eventTitle: string): { city: string; date: string } | null {
-  // Format: "Highest temperature in Hong Kong on July 6?"
   const match = eventTitle.match(/Highest temperature in (.+?) on (.+?)\??$/i);
   if (!match) return null;
   return { city: match[1].trim(), date: match[2].trim() };
@@ -32,14 +31,13 @@ export async function GET() {
   const data = await res.json();
   const events: PolymarketEvent[] = data.events || [];
 
-  let upserted = 0;
   const errors: string[] = [];
+  const rows: Record<string, unknown>[] = [];
 
   for (const event of events) {
     const parsed = parseCityAndDate(event.title);
     if (!parsed) continue;
 
-    // parse date like "July 6" -> perlu tahun, ambil dari endDate market kalau ada
     const yearGuess = new Date().getFullYear();
     const targetDate = new Date(`${parsed.date}, ${yearGuess}`);
     if (isNaN(targetDate.getTime())) {
@@ -57,25 +55,28 @@ export async function GET() {
       }
       const [yesPrice, noPrice] = prices.map(Number);
 
-      const { error } = await supabaseAdmin.from('markets').upsert(
-        {
-          city_name: parsed.city,
-          target_date: targetDate.toISOString().split('T')[0],
-          polymarket_id: market.id,
-          question: market.question,
-          current_yes_price: yesPrice,
-          current_no_price: noPrice,
-          status: market.closed ? 'settled' : 'active',
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'polymarket_id' }
-      );
+      rows.push({
+        city_name: parsed.city,
+        target_date: targetDate.toISOString().split('T')[0],
+        polymarket_id: market.id,
+        question: market.question,
+        current_yes_price: yesPrice,
+        current_no_price: noPrice,
+        status: market.closed ? 'settled' : 'active',
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
 
-      if (error) {
-        errors.push(`${market.id}: ${error.message}`);
-      } else {
-        upserted++;
-      }
+  let upserted = 0;
+  if (rows.length > 0) {
+    const { error } = await supabaseAdmin
+      .from('markets')
+      .upsert(rows, { onConflict: 'polymarket_id' });
+    if (error) {
+      errors.push(error.message);
+    } else {
+      upserted = rows.length;
     }
   }
 
