@@ -40,7 +40,12 @@ function toCelsius(value: number, unit: 'F' | 'C'): number {
   return unit === 'F' ? ((value - 32) * 5) / 9 : value;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { data: verifiedCities, error: vErr } = await supabaseAdmin
     .from('city_station_map')
     .select('city_name')
