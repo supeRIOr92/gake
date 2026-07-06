@@ -1,5 +1,4 @@
-import { supabase }
- from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import SignalCard, { type Signal } from "@/components/SignalCard";
 
 export const revalidate = 60;
@@ -53,7 +52,6 @@ async function getData() {
 
 export default async function Home() {
   const { signals, uncovered } = await getData();
-
   return (
     <div className="min-h-screen bg-[#030307] text-zinc-100">
       <header className="border-b border-zinc-800/60 px-6 py-4 flex items-center justify-between">
@@ -63,18 +61,30 @@ export default async function Home() {
             GAKE <span className="text-zinc-500 font-normal">// Alpha Layer v1.0</span>
           </span>
         </div>
-        <div className="text-xs text-zinc-500 font-mono">
+        <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
           {signals.length} SIGNALS LIVE · {uncovered.length} UNVERIFIED
         </div>
       </header>
 
       <main className="px-6 py-8 max-w-7xl mx-auto">
-        <h2 className="text-sm uppercase tracking-widest text-zinc-500 mb-4">
-          Gap Radar
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm uppercase tracking-widest text-zinc-500">
+            Gap Radar
+          </h2>
+          <span className="text-[11px] text-zinc-600">scroll for more →</span>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-3 mb-12 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-zinc-800">
           {signals.map((s) => (
-            <SignalCard key={s.id} signal={s} market={s.markets} />
+            <div
+              key={s.id}
+              className="snap-start shrink-0 w-[calc(33.333%-0.67rem)] min-w-[280px]"
+            >
+              <SignalCard signal={s} market={s.markets} />
+            </div>
           ))}
           {signals.length === 0 && (
             <p className="text-zinc-500 text-sm">
@@ -83,14 +93,17 @@ export default async function Home() {
           )}
         </div>
 
-        <h2 className="text-sm uppercase tracking-widest text-zinc-500 mb-4">
-          Live Weather Feed — Unverified Stations
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm uppercase tracking-widest text-zinc-500">
+            Live Weather Feed — Unverified Stations
+          </h2>
+          <span className="text-[11px] text-zinc-600">scroll for more →</span>
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-zinc-800">
           {uncovered.map((m) => (
             <div
               key={`${m.city_name}|${m.target_date}`}
-              className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
+              className="snap-start shrink-0 w-[calc(33.333%-0.5rem)] min-w-[180px] rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
             >
               <div className="text-sm font-medium truncate">{m.city_name}</div>
               <div className="text-xs text-zinc-500">{m.target_date}</div>
