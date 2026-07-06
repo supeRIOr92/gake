@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import SignalCard, { type Signal } from "@/components/SignalCard";
+import ExpandableSection from "@/components/ExpandableSection";
 
 export const revalidate = 60;
 
@@ -15,6 +16,11 @@ interface MarketRow {
 
 interface SignalRow extends Signal {
   markets: MarketRow;
+}
+
+interface UncoveredRow {
+  city_name: string;
+  target_date: string;
 }
 
 async function getData() {
@@ -39,7 +45,7 @@ async function getData() {
   const coveredKeys = new Set(
     signals.map((s) => `${s.markets.city_name}|${s.markets.target_date}`)
   );
-  const allKeys = new Map<string, { city_name: string; target_date: string }>();
+  const allKeys = new Map<string, UncoveredRow>();
   for (const m of allMarkets || []) {
     allKeys.set(`${m.city_name}|${m.target_date}`, m);
   }
@@ -71,39 +77,21 @@ export default async function Home() {
       </header>
 
       <main className="px-6 py-8 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm uppercase tracking-widest text-zinc-500">
-            Gap Radar
-          </h2>
-          <span className="text-[11px] text-zinc-600">scroll for more →</span>
-        </div>
-        <div className="flex gap-4 overflow-x-auto pb-3 mb-12 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-zinc-800">
+        <ExpandableSection
+          title="Gap Radar"
+          totalCount={signals.length}
+          emptyText="No signals yet. Waiting for next calculation cycle."
+        >
           {signals.map((s) => (
-            <div
-              key={s.id}
-              className="snap-start shrink-0 w-[calc(33.333%-0.67rem)] min-w-[280px]"
-            >
-              <SignalCard signal={s} market={s.markets} />
-            </div>
+            <SignalCard key={s.id} signal={s} market={s.markets} />
           ))}
-          {signals.length === 0 && (
-            <p className="text-zinc-500 text-sm">
-              No signals yet. Waiting for next calculation cycle.
-            </p>
-          )}
-        </div>
+        </ExpandableSection>
 
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm uppercase tracking-widest text-zinc-500">
-            Live Weather Feed — Unverified Stations
-          </h2>
-          <span className="text-[11px] text-zinc-600">scroll for more →</span>
-        </div>
-        <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-zinc-800">
+        <ExpandableSection title="Live Weather Feed — Unverified Stations" totalCount={uncovered.length}>
           {uncovered.map((m) => (
             <div
               key={`${m.city_name}|${m.target_date}`}
-              className="snap-start shrink-0 w-[calc(33.333%-0.5rem)] min-w-[180px] rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
+              className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
             >
               <div className="text-sm font-medium truncate">{m.city_name}</div>
               <div className="text-xs text-zinc-500">{m.target_date}</div>
@@ -112,7 +100,7 @@ export default async function Home() {
               </div>
             </div>
           ))}
-        </div>
+        </ExpandableSection>
       </main>
     </div>
   );
