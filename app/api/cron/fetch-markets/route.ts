@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-const GAMMA_API = 'https://gamma-api.polymarket.com/events';
+const SEARCH_API = 'https://gamma-api.polymarket.com/public-search';
 
 interface PolymarketMarket {
   id: string;
   question: string;
-  slug: string;
-  outcomePrices: string; // JSON string array e.g. "[\"0.11\",\"0.89\"]"
-  active: boolean;
+  outcomePrices: string;
   closed: boolean;
 }
 
@@ -17,18 +15,22 @@ interface PolymarketEvent {
   markets: PolymarketMarket[];
 }
 
-function parseCityAndDate(title: string): { city: string; date: string } | null {
-  const match = title.match(/Will the highest temperature in (.+?) be .+ on (.+)\?/i);
+function parseCityAndDate(eventTitle: string): { city: string; date: string } | null {
+  // Format: "Highest temperature in Hong Kong on July 6?"
+  const match = eventTitle.match(/Highest temperature in (.+?) on (.+?)\??$/i);
   if (!match) return null;
   return { city: match[1].trim(), date: match[2].trim() };
 }
 
 export async function GET() {
-  const res = await fetch(`${GAMMA_API}?tag=temperature&active=true&closed=false&limit=200`);
+  const res = await fetch(
+    `${SEARCH_API}?q=highest%20temperature&events_status=active&limit_per_type=100`
+  );
   if (!res.ok) {
     return NextResponse.json({ error: 'Failed to fetch Polymarket events' }, { status: 502 });
   }
-  const events: PolymarketEvent[] = await res.json();
+  const data = await res.json();
+  const events: PolymarketEvent[] = data.events || [];
 
   let upserted = 0;
   const errors: string[] = [];
@@ -36,6 +38,14 @@ export async function GET() {
   for (const event of events) {
     const parsed = parseCityAndDate(event.title);
     if (!parsed) continue;
+
+    // parse date like "July 6" -> perlu tahun, ambil dari endDate market kalau ada
+    const yearGuess = new Date().getFullYear();
+    const targetDate = new Date(`${parsed.date}, ${yearGuess}`);
+    if (isNaN(targetDate.getTime())) {
+      errors.push(`Bad date parse: ${parsed.date}`);
+      continue;
+    }
 
     for (const market of event.markets) {
       let prices: string[];
@@ -50,7 +60,7 @@ export async function GET() {
       const { error } = await supabaseAdmin.from('markets').upsert(
         {
           city_name: parsed.city,
-          target_date: new Date(parsed.date).toISOString().split('T')[0],
+          target_date: targetDate.toISOString().split('T')[0],
           polymarket_id: market.id,
           question: market.question,
           current_yes_price: yesPrice,
@@ -69,5 +79,5 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ upserted, errors });
+  return NextResponse.json({ upserted, errors, totalEvents: events.length });
 }
