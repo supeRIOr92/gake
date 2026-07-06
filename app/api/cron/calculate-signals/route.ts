@@ -95,16 +95,23 @@ const verifiedBases = new Set(
       continue;
     }
 
-    const targetBucket = parsedMarkets.find((m) => {
-      const minC = toCelsius(m.range.min, m.range.unit);
-      const maxC = toCelsius(m.range.max, m.range.unit);
-      return predictedTemp >= minC && predictedTemp <= maxC;
-    });
+function distanceToRange(temp: number, minC: number, maxC: number): number {
+  if (temp >= minC && temp <= maxC) return 0;
+  if (temp < minC) return minC - temp;
+  return temp - maxC;
+}
 
-    if (!targetBucket) {
-      errors.push(`No matching bucket for predicted temp: ${key}`);
-      continue;
-    }
+let targetBucket = parsedMarkets[0];
+let minDistance = Infinity;
+for (const m of parsedMarkets) {
+  const minC = toCelsius(m.range.min, m.range.unit);
+  const maxC = toCelsius(m.range.max, m.range.unit);
+  const d = distanceToRange(predictedTemp, minC, maxC);
+  if (d < minDistance) {
+    minDistance = d;
+    targetBucket = m;
+  }
+}
 
     const otherMarkets = parsedMarkets.filter((m) => m.id !== targetBucket.id);let noCandidates = otherMarkets.filter(
       (m) => m.current_no_price >= 0.55 && m.current_no_price <= 0.85
