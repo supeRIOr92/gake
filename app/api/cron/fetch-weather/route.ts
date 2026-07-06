@@ -48,7 +48,12 @@ async function fetchOpenMeteoTemp(
   return { temp, stdDev: null };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { data: markets, error: marketsError } = await supabaseAdmin
     .from('markets')
     .select('city_name, target_date')
@@ -103,8 +108,7 @@ export async function GET() {
     const confidenceScore = stdDev !== null
       ? stdDev < 0.5 ? 'HIGH' : stdDev < 1.5 ? 'MEDIUM' : 'LOW'
       : 'MEDIUM';
-
-    rows.push({
+      rows.push({
       city_name,
       target_date,
       predicted_temp: Number(tempC.toFixed(1)),

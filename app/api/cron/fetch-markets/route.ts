@@ -5,6 +5,7 @@ const SEARCH_API = 'https://gamma-api.polymarket.com/public-search';
 
 interface PolymarketMarket {
   id: string;
+  conditionId: string;
   question: string;
   outcomePrices: string;
   closed: boolean;
@@ -21,7 +22,12 @@ function parseCityAndDate(eventTitle: string): { city: string; date: string } | 
   return { city: match[1].trim(), date: match[2].trim() };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const res = await fetch(
     `${SEARCH_API}?q=highest%20temperature&events_status=active&limit_per_type=100`
   );
@@ -59,6 +65,7 @@ export async function GET() {
         city_name: parsed.city,
         target_date: targetDate.toISOString().split('T')[0],
         polymarket_id: market.id,
+        condition_id: market.conditionId,
         question: market.question,
         current_yes_price: yesPrice,
         current_no_price: noPrice,
