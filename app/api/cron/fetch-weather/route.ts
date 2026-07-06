@@ -69,30 +69,29 @@ export async function GET() {
   for (const { city_name, target_date } of uniqueKeys.values()) {
     const geo = await geocodeCity(city_name);
     if (!geo) {
-      errors.push(`Geocode failed: ${city_name}`);
+      errors.push(`Geocode failed: ${city_name} (${target_date})`);
       continue;
     }
 
     const isUS = geo.countryCode === 'US';
-    let tempF: number | null = null;
     let tempC: number | null = null;
-    let dataSource: string;
-    let confidenceSource: string;
+    let dataSource: string = '';
+    let confidenceSource: string = '';
     let stdDev: number | null = null;
 
     if (isUS) {
-      tempF = await fetchNWSTemp(geo.lat, geo.lon, target_date);
-      if (tempF === null) {
-        errors.push(`NWS fetch failed: ${city_name}`);
-            continue;
+      const tempF = await fetchNWSTemp(geo.lat, geo.lon, target_date);
+      if (tempF !== null) {
+        tempC = ((tempF - 32) * 5) / 9;
+        dataSource = 'NWS';
+        confidenceSource = 'forecast_consistency';
       }
-      tempC = ((tempF - 32) * 5) / 9;
-      dataSource = 'NWS';
-      confidenceSource = 'forecast_consistency';
-    } else {
-        const result = await fetchOpenMeteoTemp(geo.lat, geo.lon, target_date);
+    }
+
+    if (tempC === null) {
+      const result = await fetchOpenMeteoTemp(geo.lat, geo.lon, target_date);
       if (!result) {
-        errors.push(`Open-Meteo fetch failed: ${city_name}`);
+        errors.push(`Weather fetch failed (both NWS & Open-Meteo): ${city_name} (${target_date})`);
         continue;
       }
       tempC = result.temp;
@@ -103,12 +102,12 @@ export async function GET() {
 
     const confidenceScore = stdDev !== null
       ? stdDev < 0.5 ? 'HIGH' : stdDev < 1.5 ? 'MEDIUM' : 'LOW'
-      : 'MEDIUM'; // fallback sementara kalau tidak ada stddev (NWS)
+      : 'MEDIUM';
 
     rows.push({
       city_name,
       target_date,
-      predicted_temp: Number(tempC!.toFixed(1)),
+      predicted_temp: Number(tempC.toFixed(1)),
       temp_std_dev: stdDev,
       confidence_score: confidenceScore,
       data_source: dataSource,
