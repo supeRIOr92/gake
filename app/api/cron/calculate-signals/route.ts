@@ -100,6 +100,19 @@ const verifiedBases = new Set(
       continue;
     }
 
+    // Skip events where any bucket price is already at an extreme (>=0.98 or <=0.02).
+    // A weather market can converge to a near-certain outcome (actual temp already
+    // observed) well before Polymarket flips its `closed` flag — at that point the
+    // package is no longer actionable (entry price ~1.00 = no real profit, only fees),
+    // so we don't want to generate a misleading signal for it.
+    const isDecided = parsedMarkets.some(
+      (m) => m.current_yes_price >= 0.98 || m.current_yes_price <= 0.02
+    );
+    if (isDecided) {
+      errors.push(`Skipped, market already effectively decided: ${key}`);
+      continue;
+    }
+
 function distanceToRange(temp: number, minC: number, maxC: number): number {
   if (temp >= minC && temp <= maxC) return 0;
   if (temp < minC) return minC - temp;

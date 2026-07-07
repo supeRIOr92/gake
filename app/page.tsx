@@ -1,7 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import SignalCard, { type Signal } from "@/components/SignalCard";
+import HeroSignalCard from "@/components/HeroSignalCard";
 import ExpandableSection from "@/components/ExpandableSection";
 import SharpMoneySidebar from "@/components/SharpMoneySidebar";
+import StatsBanner from "@/components/StatsBanner";
+import Link from "next/link";
 
 export const revalidate = 60;
 
@@ -35,6 +38,11 @@ interface ActivityRow {
   markets: { city_name: string; target_date: string } | null;
 }
 
+interface ResolvedRow {
+  net_pnl_pct: number;
+  result_status: string;
+}
+
 async function getData() {
   const { data: signalsRaw } = await supabase
     .from("gake_signals")
@@ -47,7 +55,13 @@ async function getData() {
   for (const s of (signalsRaw || []) as unknown as SignalRow[]) {
     if (!latestByMarket.has(s.market_id)) latestByMarket.set(s.market_id, s);
   }
-  const signals = Array.from(latestByMarket.values());
+  // Filter out signals whose underlying market has already effectively decided
+  // (price converged to ~0 or ~1 before Polymarket flips its `closed` flag) — these
+  // are no longer actionable and would otherwise show a misleading Net Gap.
+  const actionableSignals = Array.from(latestByMarket.values()).filter(
+    (s) => s.markets.current_yes_price < 0.98 && s.markets.current_yes_price > 0.02
+  );
+  const signals = actionableSignals.sort((a, b) => b.net_gap - a.net_gap);
 
   const { data: allMarkets } = await supabase
     .from("markets")
@@ -87,29 +101,71 @@ async function getData() {
 
   const activity = (activityRaw || []) as unknown as ActivityRow[];
 
-  return { signals, uncovered, activity };
+  const { data: resolvedRaw } = await supabase
+    .from("resolved_signals")
+    .select("net_pnl_pct, result_status");
+
+  const resolved = (resolvedRaw || []) as ResolvedRow[];
+
+  return { signals, uncovered, activity, resolved };
 }
 
 export default async function Home() {
-  const { signals, uncovered, activity } = await getData();
+  const { signals, uncovered, activity, resolved } = await getData();
+
+  const totalResolved = resolved.length;
+  const successCount = resolved.filter((r) => r.result_status === "SUCCESS").length;
+  const winRatePct = totalResolved > 0 ? ((successCount / totalResolved) * 100).toFixed(1) : "—";
+  const avgRoi =
+    totalResolved > 0
+      ? (resolved.reduce((sum, r) => sum + r.net_pnl_pct, 0) / totalResolved).toFixed(1)
+      : "—";
+
+  const topSignal = signals[0];
+  const restSignals = signals.slice(1);
+
   return (
     <div className="max-w-[1400px] mx-auto px-5 sm:px-10 py-8 flex flex-col lg:flex-row gap-7">
       <div className="flex-1 min-w-0">
-        <div className="mb-6 text-[13px] text-[color:var(--text-dim)]">
-          <b className="text-[color:var(--foreground)] font-bold">{signals.length}</b> signals live
-          &nbsp;·&nbsp;
-          <b className="text-[color:var(--foreground)] font-bold">{uncovered.length}</b> other open markets
-        </div>
+        <p className="text-[13.5px] text-[color:var(--text-dim)] leading-relaxed mb-6 max-w-2xl">
+          GAKE scans every open weather market on Polymarket and surfaces mispricing —
+          both hedged strategy packages and whale timing signals.{" "}
+          <Link href="/about" className="text-[color:var(--purple-bright)] font-semibold">
+            How it works →
+          </Link>
+        </p>
 
-        <ExpandableSection
-          title="Gap Radar"
-          totalCount={signals.length}
-          emptyText="No signals yet. Waiting for next calculation cycle."
-        >
-          {signals.map((s) => (
-            <SignalCard key={s.id} signal={s} market={s.markets} />
-          ))}
-        </ExpandableSection>
+        <StatsBanner
+          stats={[
+            { label: "Signals Live", value: String(signals.length) },
+            { label: "Resolved Events", value: String(totalResolved) },
+            { label: "Win Rate", value: `${winRatePct}%`, accent: "green" },
+            {
+              label: "Avg ROI / Event",
+              value: totalResolved > 0 ? `${Number(avgRoi) >= 0 ? "+" : ""}${avgRoi}%` : "—",
+              accent: Number(avgRoi) >= 0 ? "green" : "red",
+            },
+          ]}
+        />
+
+        {topSignal && <HeroSignalCard signal={topSignal} market={topSignal.markets} />}
+
+        {restSignals.length > 0 && (
+          <ExpandableSection
+            title="Gap Radar"
+            totalCount={restSignals.length}
+          >
+            {restSignals.map((s) => (
+              <SignalCard key={s.id} signal={s} market={s.markets} />
+            ))}
+          </ExpandableSection>
+        )}
+
+        {signals.length === 0 && (
+          <p className="text-[color:var(--text-dim)] text-sm mb-9">
+            No signals yet. Waiting for next calculation cycle.
+          </p>
+        )}
 
         <ExpandableSection title="Live Weather Feed — Other Open Markets" totalCount={uncovered.length}>
           {uncovered.map((m) => (
