@@ -87,6 +87,9 @@ export default async function Home() {
           </span>
         </div>
         <div className="flex items-center gap-4">
+          <a href="/scalp" className="text-xs text-zinc-500 hover:text-zinc-300">
+            Scalp Signal
+          </a>
           <a href="/ledger" className="text-xs text-zinc-500 hover:text-zinc-300">
             Ledger
           </a>

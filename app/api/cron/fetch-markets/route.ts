@@ -9,6 +9,7 @@ interface PolymarketMarket {
   question: string;
   outcomePrices: string;
   closed: boolean;
+  createdAt: string;
 }
 
 interface PolymarketEvent {
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
         current_yes_price: yesPrice,
         current_no_price: noPrice,
         status: market.closed ? 'settled' : 'active',
+        opened_at: market.createdAt,
         updated_at: new Date().toISOString(),
       });
     }
