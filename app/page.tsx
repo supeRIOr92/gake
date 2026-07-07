@@ -78,61 +78,39 @@ async function getData() {
 export default async function Home() {
   const { signals, uncovered, activity } = await getData();
   return (
-    <div className="min-h-screen bg-[#030307] text-zinc-100">
-      <header className="border-b border-zinc-800/60 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded bg-emerald-500/20 border border-emerald-500/50" />
-          <span className="font-semibold tracking-tight">
-            GAKE <span className="text-zinc-500 font-normal">// Alpha Layer v1.0</span>
-          </span>
+    <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-6">
+      <div className="flex-1 min-w-0">
+        <div className="mb-6 text-xs text-zinc-500 font-mono">
+          {signals.length} SIGNALS LIVE · {uncovered.length} UNVERIFIED
         </div>
-        <div className="flex items-center gap-4">
-          <a href="/scalp" className="text-xs text-zinc-500 hover:text-zinc-300">
-            Scalp Signal
-          </a>
-          <a href="/ledger" className="text-xs text-zinc-500 hover:text-zinc-300">
-            Ledger
-          </a>
-          <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            {signals.length} SIGNALS LIVE · {uncovered.length} UNVERIFIED
-          </div>
-        </div>
-      </header>
 
-      <main className="px-6 py-8 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
-        <div className="flex-1 min-w-0">
-          <ExpandableSection
-            title="Gap Radar"
-            totalCount={signals.length}
-            emptyText="No signals yet. Waiting for next calculation cycle."
-          >
-            {signals.map((s) => (
-              <SignalCard key={s.id} signal={s} market={s.markets} />
-            ))}
-          </ExpandableSection>
+        <ExpandableSection
+          title="Gap Radar"
+          totalCount={signals.length}
+          emptyText="No signals yet. Waiting for next calculation cycle."
+        >
+          {signals.map((s) => (
+            <SignalCard key={s.id} signal={s} market={s.markets} />
+          ))}
+        </ExpandableSection>
 
-          <ExpandableSection title="Live Weather Feed — Unverified Stations" totalCount={uncovered.length}>
-            {uncovered.map((m) => (
-              <div
-                key={`${m.city_name}|${m.target_date}`}
-                className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
-              >
-                <div className="text-sm font-medium truncate">{m.city_name}</div>
-                <div className="text-xs text-zinc-500">{m.target_date}</div>
-                <div className="mt-1 text-[10px] uppercase tracking-wide text-amber-500/80 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
-                  No Signal
-                </div>
+        <ExpandableSection title="Live Weather Feed — Unverified Stations" totalCount={uncovered.length}>
+          {uncovered.map((m) => (
+            <div
+              key={`${m.city_name}|${m.target_date}`}
+              className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
+            >
+              <div className="text-sm font-medium truncate">{m.city_name}</div>
+              <div className="text-xs text-zinc-500">{m.target_date}</div>
+              <div className="mt-1 text-[10px] uppercase tracking-wide text-amber-500/80 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
+                No Signal
               </div>
-            ))}
-          </ExpandableSection>
-        </div>
+            </div>
+          ))}
+        </ExpandableSection>
+      </div>
 
-        <SharpMoneySidebar activity={activity} />
-      </main>
+      <SharpMoneySidebar activity={activity} />
     </div>
   );
 }

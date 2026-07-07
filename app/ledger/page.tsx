@@ -44,17 +44,8 @@ export default async function LedgerPage() {
   const displayList = [...resolved].reverse();
 
   return (
-    <div className="min-h-screen bg-[#030307] text-zinc-100">
-      <header className="border-b border-zinc-800/60 px-6 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded bg-emerald-500/20 border border-emerald-500/50" />
-          <span className="font-semibold tracking-tight">
-            GAKE <span className="text-zinc-500 font-normal">// Ledger</span>
-          </span>
-        </a>
-      </header>
+    <div className="max-w-5xl mx-auto px-6 py-8">
 
-      <main className="px-6 py-8 max-w-5xl mx-auto">
         <h1 className="text-lg font-semibold mb-1">Historical Performance</h1>
         <p className="text-sm text-zinc-500 mb-6">
           Transparent log of settled weather markets GAKE has tracked.
@@ -140,7 +131,7 @@ export default async function LedgerPage() {
             </tbody>
           </table>
         </div>
-      </main>
     </div>
   );
 }
+
