@@ -1,3 +1,11 @@
+function ExampleBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-black/20 border border-[color:var(--border)] p-4 text-[13px] leading-relaxed">
+      {children}
+    </div>
+  );
+}
+
 export default function AboutPage() {
   return (
     <div className="max-w-3xl mx-auto px-5 sm:px-10 py-8">
@@ -31,9 +39,42 @@ export default function AboutPage() {
             hold a spread of outcomes so a small miss on the exact temperature doesn&apos;t wipe
             out the whole position.
           </p>
+
+          <ExampleBox>
+            <p className="text-[color:var(--foreground)] font-semibold mb-2">
+              Example — Houston, July 6
+            </p>
+            <p className="mb-1.5">
+              Forecast says Houston will likely hit 98-99°F. GAKE builds this package:
+            </p>
+            <ul className="space-y-1 font-mono text-[12px]">
+              <li>
+                <span className="text-[color:var(--green)] font-bold">YES</span> &quot;Above 98°F&quot;
+                — 30% budget @ 0.55
+              </li>
+              <li>
+                <span className="text-[color:var(--red)] font-bold">NO</span> &quot;Above 102°F&quot;
+                — 25% budget @ 0.88
+              </li>
+              <li>
+                <span className="text-[color:var(--red)] font-bold">NO</span> &quot;Above 105°F&quot;
+                — 25% budget @ 0.93
+              </li>
+              <li>
+                <span className="text-[color:var(--red)] font-bold">NO</span> &quot;Below 90°F&quot;
+                — 20% budget @ 0.91
+              </li>
+            </ul>
+            <p className="mt-2 text-[12px]">
+              If the actual high lands anywhere in the 90-102°F range, at least the YES
+              position and most NO positions pay out — the package survives a forecast miss
+              of a few degrees instead of losing everything on one exact bucket.
+            </p>
+          </ExampleBox>
+
           <p>
             <span className="text-[color:var(--foreground)] font-semibold">How to use it:</span> click a card
-            in the Gap Radar to expand it, review the suggested allocation percentages, then
+            in the Gap Radar to open its details, review the suggested allocation percentages, then
             copy each Contract ID and place the trades yourself on Polymarket. You decide
             your own budget and execution — GAKE only tells you the split.
           </p>
@@ -58,13 +99,42 @@ export default function AboutPage() {
             tends to correct significantly within about 27 hours on average — regardless of
             what the actual weather turns out to be on settlement day.
           </p>
+
+          <ExampleBox>
+            <p className="text-[color:var(--foreground)] font-semibold mb-2">
+              Example — Seoul, entry to exit
+            </p>
+            <ul className="space-y-1.5">
+              <li>
+                <span className="text-[color:var(--purple-bright)] font-semibold">1. New Entry Radar</span>{" "}
+                — Whale-37 detected buying <span className="text-[color:var(--red)] font-bold">NO</span> at
+                0.82, 6 minutes ago, on a market opened 2 hours ago. You buy NO manually
+                on Polymarket around the same price.
+              </li>
+              <li>
+                <span className="text-[color:var(--purple-bright)] font-semibold">2. Wait</span> — you do
+                nothing for the next ~27 hours (the historical median hold time before whales
+                exit this type of position).
+              </li>
+              <li>
+                <span className="text-[color:var(--purple-bright)] font-semibold">3. Exit Progress</span> —
+                the market moves into the 24-48h bucket. Move on your position climbs to
+                +38%, past the +30% mark on the progress bar. That&apos;s your cue: sell manually
+                on Polymarket and lock in the gain — don&apos;t wait for the weather to actually
+                settle.
+              </li>
+            </ul>
+          </ExampleBox>
+
           <p>
-            <span className="text-[color:var(--foreground)] font-semibold">How to use it:</span> watch the{" "}
-            <span className="text-[color:var(--green)]">FRESH</span> list for a market where a whale
-            just entered. Enter the same side manually on Polymarket, then watch the
-            &quot;Move&quot; column — once the price has moved meaningfully in your favor, exit
-            manually. You are not holding until settlement; you&apos;re trading the price
-            correction itself.
+            <span className="text-[color:var(--foreground)] font-semibold">How to use it:</span> watch{" "}
+            <span className="text-[color:var(--purple-bright)] font-semibold">New Entry Radar</span> for a
+            market where a whale just entered — the newer, the closer you can match their entry
+            price. Enter the same side manually on Polymarket. Once that market moves into{" "}
+            <span className="text-[color:var(--purple-bright)] font-semibold">Exit Progress</span>, watch
+            the Move percentage against the +30-50% historical target — the closer or past it,
+            the more urgent it is to check and exit manually. You are not holding until
+            settlement; you&apos;re trading the price correction itself.
           </p>
         </div>
       </section>

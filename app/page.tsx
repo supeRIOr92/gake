@@ -22,6 +22,7 @@ interface SignalRow extends Signal {
 interface UncoveredRow {
   city_name: string;
   target_date: string;
+  predicted_temp: number | null;
 }
 
 interface ActivityRow {
@@ -56,13 +57,27 @@ async function getData() {
   const coveredKeys = new Set(
     signals.map((s) => `${s.markets.city_name}|${s.markets.target_date}`)
   );
-  const allKeys = new Map<string, UncoveredRow>();
+  const allKeys = new Map<string, { city_name: string; target_date: string }>();
   for (const m of allMarkets || []) {
     allKeys.set(`${m.city_name}|${m.target_date}`, m);
   }
-  const uncovered = Array.from(allKeys.values()).filter(
+  const uncoveredKeys = Array.from(allKeys.values()).filter(
     (m) => !coveredKeys.has(`${m.city_name}|${m.target_date}`)
   );
+
+  const { data: forecastsRaw } = await supabase
+    .from("weather_forecasts")
+    .select("city_name, target_date, predicted_temp");
+
+  const forecastByKey = new Map<string, number>();
+  for (const f of forecastsRaw || []) {
+    forecastByKey.set(`${f.city_name}|${f.target_date}`, f.predicted_temp);
+  }
+
+  const uncovered: UncoveredRow[] = uncoveredKeys.map((m) => ({
+    ...m,
+    predicted_temp: forecastByKey.get(`${m.city_name}|${m.target_date}`) ?? null,
+  }));
 
   const { data: activityRaw } = await supabase
     .from("wallet_activity")
@@ -83,7 +98,7 @@ export default async function Home() {
         <div className="mb-6 text-[13px] text-[color:var(--text-dim)]">
           <b className="text-[color:var(--foreground)] font-bold">{signals.length}</b> signals live
           &nbsp;·&nbsp;
-          <b className="text-[color:var(--foreground)] font-bold">{uncovered.length}</b> unverified stations
+          <b className="text-[color:var(--foreground)] font-bold">{uncovered.length}</b> other open markets
         </div>
 
         <ExpandableSection
@@ -96,7 +111,7 @@ export default async function Home() {
           ))}
         </ExpandableSection>
 
-        <ExpandableSection title="Live Weather Feed — Unverified Stations" totalCount={uncovered.length}>
+        <ExpandableSection title="Live Weather Feed — Other Open Markets" totalCount={uncovered.length}>
           {uncovered.map((m) => (
             <div
               key={`${m.city_name}|${m.target_date}`}
@@ -106,9 +121,20 @@ export default async function Home() {
               <div className="font-mono text-[11px] text-[color:var(--text-faint)] mt-1 mb-3">
                 {m.target_date}
               </div>
-              <div className="text-[11px] font-semibold text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.1)] rounded-full px-3 py-1.5 inline-block">
-                NO SIGNAL
-              </div>
+              {m.predicted_temp !== null ? (
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-lg font-semibold text-[color:var(--foreground)]">
+                    {m.predicted_temp.toFixed(1)}°C
+                  </span>
+                  <span className="text-[10px] font-semibold text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.1)] rounded-full px-2.5 py-1">
+                    NO PACKAGE
+                  </span>
+                </div>
+              ) : (
+                <div className="text-[11px] font-semibold text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.1)] rounded-full px-3 py-1.5 inline-block">
+                  FETCHING...
+                </div>
+              )}
             </div>
           ))}
         </ExpandableSection>
