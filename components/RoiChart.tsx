@@ -6,7 +6,7 @@ interface DataPoint {
 export default function RoiChart({ data }: { data: DataPoint[] }) {
   if (data.length === 0) {
     return (
-      <div className="h-40 flex items-center justify-center text-zinc-600 text-sm">
+      <div className="h-40 flex items-center justify-center text-[color:var(--text-faint)] text-sm">
         No resolved events yet.
       </div>
     );
@@ -41,21 +41,21 @@ export default function RoiChart({ data }: { data: DataPoint[] }) {
           y1={zeroY}
           x2={width}
           y2={zeroY}
-          stroke="#3f3f46"
+          stroke="#3a3452"
           strokeWidth="0.5"
           strokeDasharray="2,2"
         />
         <polyline
           points={points.join(" ")}
           fill="none"
-          stroke={isPositive ? "#34d399" : "#f87171"}
+          stroke={isPositive ? "#7ee8b8" : "#f2879f"}
           strokeWidth="1.5"
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <div className="flex justify-between text-[10px] text-zinc-600 mt-1 font-mono">
+      <div className="flex justify-between text-[10px] text-[color:var(--text-faint)] mt-1 font-mono">
         <span>{data[0].date}</span>
-        <span className={isPositive ? "text-emerald-400" : "text-red-400"}>
+        <span className={isPositive ? "text-[color:var(--green)]" : "text-[color:var(--red)]"}>
           {isPositive ? "+" : ""}
           {last.cumulative}%
         </span>

@@ -78,10 +78,12 @@ async function getData() {
 export default async function Home() {
   const { signals, uncovered, activity } = await getData();
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-6">
+    <div className="max-w-[1400px] mx-auto px-5 sm:px-10 py-8 flex flex-col lg:flex-row gap-7">
       <div className="flex-1 min-w-0">
-        <div className="mb-6 text-xs text-zinc-500 font-mono">
-          {signals.length} SIGNALS LIVE · {uncovered.length} UNVERIFIED
+        <div className="mb-6 text-[13px] text-[color:var(--text-dim)]">
+          <b className="text-[color:var(--foreground)] font-bold">{signals.length}</b> signals live
+          &nbsp;·&nbsp;
+          <b className="text-[color:var(--foreground)] font-bold">{uncovered.length}</b> unverified stations
         </div>
 
         <ExpandableSection
@@ -98,12 +100,14 @@ export default async function Home() {
           {uncovered.map((m) => (
             <div
               key={`${m.city_name}|${m.target_date}`}
-              className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2"
+              className="rounded-[18px] border border-[color:var(--border)] bg-[color:var(--panel)] px-5 py-4.5"
             >
-              <div className="text-sm font-medium truncate">{m.city_name}</div>
-              <div className="text-xs text-zinc-500">{m.target_date}</div>
-              <div className="mt-1 text-[10px] uppercase tracking-wide text-amber-500/80 border border-amber-500/30 rounded px-1.5 py-0.5 inline-block">
-                No Signal
+              <div className="text-base font-bold truncate">{m.city_name}</div>
+              <div className="font-mono text-[11px] text-[color:var(--text-faint)] mt-1 mb-3">
+                {m.target_date}
+              </div>
+              <div className="text-[11px] font-semibold text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.1)] rounded-full px-3 py-1.5 inline-block">
+                NO SIGNAL
               </div>
             </div>
           ))}

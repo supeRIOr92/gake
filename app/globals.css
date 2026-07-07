@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030307;
-  --foreground: #f4f4f5;
+  --background: #0e0b1a;
+  --panel: #191428;
+  --panel-2: #201a34;
+  --border: rgba(171, 159, 242, 0.16);
+  --purple: #ab9ff2;
+  --purple-deep: #6f5fe0;
+  --purple-bright: #c9c0ff;
+  --foreground: #f1eefc;
+  --text-dim: #9089b8;
+  --text-faint: #5f5980;
+  --green: #7ee8b8;
+  --red: #f2879f;
 }
 
 @theme inline {
@@ -16,4 +26,41 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(90px);
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+body::before {
+  width: 480px;
+  height: 480px;
+  background: var(--purple-deep);
+  top: -180px;
+  left: -100px;
+}
+
+body::after {
+  width: 420px;
+  height: 420px;
+  background: #4a3fb0;
+  bottom: -150px;
+  right: -80px;
+  opacity: 0.25;
+}
+
+header,
+main,
+footer {
+  position: relative;
+  z-index: 1;
 }

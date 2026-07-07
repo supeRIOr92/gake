@@ -40,9 +40,9 @@ export default async function ScalpPage() {
   const aging = signals.filter((s) => s.age_status === "AGING");
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
-      <h1 className="text-lg font-semibold mb-1">Live Entry Alerts</h1>
-      <p className="text-sm text-zinc-500 mb-6">
+    <div className="max-w-5xl mx-auto px-5 sm:px-10 py-8">
+      <h1 className="text-xl font-bold tracking-tight mb-1.5">Live Entry Alerts</h1>
+      <p className="text-sm text-[color:var(--text-dim)] mb-7 leading-relaxed">
         Whale entries detected on fresh, potentially mispriced markets. Not directional
         weather bets — pure timing arbitrage. Exit manually once price re-corrects.
         Median hold time historically ~27 hours.
@@ -68,13 +68,13 @@ export default async function ScalpPage() {
         ))}
       </ExpandableSection>
 
-      <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 mt-8 text-center">
-        <p className="text-sm text-zinc-400 mb-2">
+      <div className="rounded-[20px] border border-[color:var(--border)] bg-[color:var(--panel)] p-6 mt-8 text-center">
+        <p className="text-sm text-[color:var(--text-dim)] mb-3">
           Get pinged the moment a fresh mispricing or exit window appears.
         </p>
         <a
           href="https://t.me/"
-          className="inline-block text-xs font-mono px-3 py-1.5 rounded border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+          className="inline-block text-xs font-mono font-semibold px-4 py-2 rounded-full bg-gradient-to-br from-[#c9c0ff] to-[#ab9ff2] text-[#0e0b1a] hover:opacity-90 transition-opacity"
         >
           Connect Telegram Alerts
         </a>

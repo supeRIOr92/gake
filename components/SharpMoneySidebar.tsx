@@ -23,48 +23,48 @@ function timeAgo(iso: string): string {
 
 export default function SharpMoneySidebar({ activity }: { activity: ActivityRow[] }) {
   return (
-    <aside className="w-full lg:w-72 shrink-0 border border-zinc-800/60 rounded-xl bg-zinc-950/40 p-4 h-fit">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+    <aside className="w-full lg:w-[340px] shrink-0 rounded-[20px] border border-[color:var(--border)] bg-[color:var(--panel)] p-5 h-fit lg:sticky lg:top-24">
+      <div className="flex items-center gap-2.5 pb-4 mb-1 border-b border-[color:var(--border)]">
+        <span className="relative flex h-[7px] w-[7px]">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[color:var(--green)] opacity-75" />
+          <span className="relative inline-flex rounded-full h-[7px] w-[7px] bg-[color:var(--green)] shadow-[0_0_6px_var(--green)]" />
         </span>
-        <h3 className="text-sm uppercase tracking-widest text-zinc-500">
-          Sharp Money Monitor
-        </h3>
+        <h3 className="text-sm font-bold">Sharp Money Monitor</h3>
       </div>
-      <div className="flex flex-col gap-2 font-mono text-[11px] max-h-[520px] overflow-y-auto">
+      <div className="flex flex-col font-mono text-[11px] max-h-[520px] overflow-y-auto">
         {activity.length === 0 && (
-          <p className="text-zinc-600 text-xs font-sans">
+          <p className="text-[color:var(--text-faint)] text-xs font-sans py-3">
             No large trades detected yet.
           </p>
         )}
         {activity.map((a) => (
           <div
             key={a.id}
-            className="border-l-2 border-zinc-800 pl-2 py-1 hover:border-emerald-500/50 transition-colors"
+            className="py-3.5 border-b border-[color:var(--border)] last:border-b-0"
           >
-            <div className="flex items-center justify-between text-zinc-500">
-              <span>{a.wallet_label}</span>
-              <span>{timeAgo(a.tx_time)}</span>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-[color:var(--purple-bright)] font-semibold text-[12px]">
+                {a.wallet_label}
+              </span>
+              <span className="text-[10.5px] text-[color:var(--text-faint)]">
+                {timeAgo(a.tx_time)}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="text-[13.5px] font-sans font-medium mb-0.5">
               <span
                 className={
                   a.side === "YES"
-                    ? "text-emerald-400 font-semibold"
+                    ? "text-[color:var(--green)] font-bold"
                     : a.side === "NO"
-                    ? "text-red-400 font-semibold"
-                    : "text-zinc-400"
+                    ? "text-[color:var(--red)] font-bold"
+                    : "text-[color:var(--text-dim)]"
                 }
               >
                 {a.side}
-              </span>
-              <span className="text-zinc-300 truncate">
-                {a.markets?.city_name ?? "Unknown"}
-              </span>
+              </span>{" "}
+              {a.markets?.city_name ?? "Unknown"}
             </div>
-            <div className="text-zinc-600">
+            <div className="text-[11.5px] text-[color:var(--text-faint)]">
               @ {a.entry_price.toFixed(3)} · ${a.size_usd.toLocaleString()}
             </div>
           </div>

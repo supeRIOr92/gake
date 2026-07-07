@@ -44,94 +44,107 @@ export default async function LedgerPage() {
   const displayList = [...resolved].reverse();
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-5 sm:px-10 py-8">
+      <h1 className="text-xl font-bold tracking-tight mb-1.5">Historical Performance</h1>
+      <p className="text-sm text-[color:var(--text-dim)] mb-7">
+        Transparent log of settled weather markets GAKE has tracked.
+      </p>
 
-        <h1 className="text-lg font-semibold mb-1">Historical Performance</h1>
-        <p className="text-sm text-zinc-500 mb-6">
-          Transparent log of settled weather markets GAKE has tracked.
-        </p>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 text-center">
-            <div className="text-[11px] text-zinc-500 uppercase">Resolved Events</div>
-            <div className="text-2xl font-mono mt-1">{total}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
+          <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
+            Resolved Events
           </div>
-          <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 text-center">
-            <div className="text-[11px] text-zinc-500 uppercase">Win Rate</div>
-            <div className="text-2xl font-mono mt-1 text-emerald-400">{winRatePct}%</div>
+          <div className="font-mono text-2xl mt-1.5">{total}</div>
+        </div>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
+          <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
+            Win Rate
           </div>
-          <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 text-center">
-            <div className="text-[11px] text-zinc-500 uppercase">Avg ROI / Event</div>
-            <div
-              className={`text-2xl font-mono mt-1 ${
-                Number(avgRoi) >= 0 ? "text-emerald-400" : "text-red-400"
-              }`}
-            >
-              {Number(avgRoi) >= 0 ? "+" : ""}
-              {avgRoi}%
-            </div>
-          </div>
-          <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 text-center">
-            <div className="text-[11px] text-zinc-500 uppercase">Defended</div>
-            <div className="text-2xl font-mono mt-1 text-amber-400">{defendedCount}</div>
+          <div className="font-mono text-2xl mt-1.5 text-[color:var(--green)]">
+            {winRatePct}%
           </div>
         </div>
-
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 mb-10">
-          <div className="text-xs text-zinc-500 uppercase tracking-wide mb-3">
-            Cumulative ROI
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
+          <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
+            Avg ROI / Event
           </div>
-          <RoiChart data={chartData} />
+          <div
+            className={`font-mono text-2xl mt-1.5 ${
+              Number(avgRoi) >= 0 ? "text-[color:var(--green)]" : "text-[color:var(--red)]"
+            }`}
+          >
+            {Number(avgRoi) >= 0 ? "+" : ""}
+            {avgRoi}%
+          </div>
         </div>
-                <div className="rounded-xl border border-zinc-800/60 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-900/60 text-zinc-500 text-[11px] uppercase">
-              <tr>
-                <th className="text-left px-4 py-2">City</th>
-                <th className="text-left px-4 py-2">Date</th>
-                <th className="text-right px-4 py-2">Net ROI</th>
-                <th className="text-right px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayList.map((r) => (
-                <tr key={r.id} className="border-t border-zinc-800/60">
-                  <td className="px-4 py-2">{r.city_name}</td>
-                  <td className="px-4 py-2 text-zinc-500">{r.target_date}</td>
-                  <td
-                    className={`px-4 py-2 text-right font-mono ${
-                      r.net_pnl_pct >= 0 ? "text-emerald-400" : "text-red-400"
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
+          <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
+            Defended
+          </div>
+          <div className="font-mono text-2xl mt-1.5 text-[#f2c879]">{defendedCount}</div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-5 mb-10">
+        <div className="text-xs text-[color:var(--text-faint)] font-semibold uppercase tracking-wide mb-3">
+          Cumulative ROI
+        </div>
+        <RoiChart data={chartData} />
+      </div>
+
+      <div className="rounded-2xl border border-[color:var(--border)] overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-black/20 text-[color:var(--text-faint)] text-[11px] font-semibold uppercase">
+            <tr>
+              <th className="text-left px-4 py-3">City</th>
+              <th className="text-left px-4 py-3">Date</th>
+              <th className="text-right px-4 py-3">Net ROI</th>
+              <th className="text-right px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayList.map((r) => (
+              <tr key={r.id} className="border-t border-[color:var(--border)]">
+                <td className="px-4 py-3 font-medium">{r.city_name}</td>
+                <td className="px-4 py-3 text-[color:var(--text-faint)] font-mono text-xs">
+                  {r.target_date}
+                </td>
+                <td
+                  className={`px-4 py-3 text-right font-mono ${
+                    r.net_pnl_pct >= 0
+                      ? "text-[color:var(--green)]"
+                      : "text-[color:var(--red)]"
+                  }`}
+                >
+                  {r.net_pnl_pct >= 0 ? "+" : ""}
+                  {r.net_pnl_pct}%
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span
+                    className={`text-[10px] font-bold uppercase font-mono px-2.5 py-1 rounded-full ${
+                      r.result_status === "SUCCESS"
+                        ? "text-[color:var(--green)] bg-[rgba(126,232,184,0.12)]"
+                        : r.result_status === "DEFENDED"
+                        ? "text-[#f2c879] bg-[rgba(242,200,121,0.12)]"
+                        : "text-[color:var(--red)] bg-[rgba(242,135,159,0.12)]"
                     }`}
                   >
-                    {r.net_pnl_pct >= 0 ? "+" : ""}
-                    {r.net_pnl_pct}%
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <span
-                      className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded border ${
-                        r.result_status === "SUCCESS"
-                          ? "text-emerald-400 border-emerald-500/40"
-                          : r.result_status === "DEFENDED"
-                          ? "text-amber-400 border-amber-500/40"
-                          : "text-red-400 border-red-500/40"
-                      }`}
-                    >
-                      {r.result_status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {displayList.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-zinc-600">
-                    No resolved events yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    {r.result_status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {displayList.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-[color:var(--text-faint)]">
+                  No resolved events yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-

@@ -17,14 +17,16 @@ export default function ExpandableSection({
 }) {
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? children : children.slice(0, visibleCount);
-  const hasMore = totalCount > visibleCount;return (
-    <section className="mb-12">
+  const hasMore = totalCount > visibleCount;
+
+  return (
+    <section className="mb-9">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm uppercase tracking-widest text-zinc-500">{title}</h2>
+        <h2 className="text-[15px] font-bold tracking-tight">{title}</h2>
         {hasMore && (
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="text-[11px] text-zinc-400 hover:text-emerald-400 border border-zinc-700 rounded px-2 py-1 transition-colors"
+            className="text-[12.5px] font-semibold text-[color:var(--purple-bright)] bg-[color:var(--panel)] border border-[color:var(--border)] rounded-[10px] px-3.5 py-1.5 transition-colors hover:border-[color:var(--purple)]"
           >
             {expanded ? "Show less ↑" : `Show all (${totalCount}) ↓`}
           </button>
@@ -33,7 +35,7 @@ export default function ExpandableSection({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {shown}
         {totalCount === 0 && emptyText && (
-          <p className="text-zinc-500 text-sm">{emptyText}</p>
+          <p className="text-[color:var(--text-dim)] text-sm">{emptyText}</p>
         )}
       </div>
     </section>
