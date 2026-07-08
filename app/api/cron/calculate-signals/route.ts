@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+export const maxDuration = 60;
+
 interface Market {
   id: string;
   city_name: string;
@@ -96,6 +98,20 @@ export async function GET(req: Request) {
     whaleNoCostByMarket.set(a.market_id, (whaleNoCostByMarket.get(a.market_id) || 0) + a.size_usd);
   }
 
+  // Pull ALL forecasts in one query instead of one query per event in the loop
+  // below — with 100+ events, per-event sequential queries blow past the
+  // function's timeout budget (same root cause as the fetch-weather timeout
+  // fixed earlier).
+  const { data: forecastsRaw, error: fErr } = await supabaseAdmin
+    .from('weather_forecasts')
+    .select('city_name, target_date, predicted_temp');
+  if (fErr) return NextResponse.json({ error: fErr.message }, { status: 500 });
+
+  const forecastByKey = new Map<string, number>();
+  for (const f of (forecastsRaw || []) as { city_name: string; target_date: string; predicted_temp: number }[]) {
+    forecastByKey.set(`${f.city_name}|${f.target_date}`, f.predicted_temp);
+  }
+
   const events = new Map<string, Market[]>();
   for (const m of (markets || []) as Market[]) {
     const key = `${m.city_name}|${m.target_date}`;
@@ -112,18 +128,12 @@ export async function GET(req: Request) {
     const cityBase = cityName.split(',')[0].trim().toLowerCase();
     if (!verifiedBases.has(cityBase)) continue;
 
-    const { data: forecast } = await supabaseAdmin
-      .from('weather_forecasts')
-      .select('predicted_temp')
-      .eq('city_name', cityName)
-      .eq('target_date', targetDate)
-      .maybeSingle();
+    const predictedTemp = forecastByKey.get(key);
 
-    if (!forecast) {
+    if (predictedTemp === undefined) {
       errors.push(`No forecast: ${key}`);
       continue;
     }
-    const predictedTemp = forecast.predicted_temp;
 
     const parsedMarkets = eventMarkets
       .map((m) => ({ ...m, range: parseTempRange(m.question) }))
