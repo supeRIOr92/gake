@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { geocodeCity } from '@/lib/geocode';
 
+export const maxDuration = 60;
+
 interface NWSPointsResponse {
   properties: { forecast: string };
 }
@@ -48,6 +50,64 @@ async function fetchOpenMeteoTemp(
   return { temp, stdDev: null };
 }
 
+async function processOne(
+  city_name: string,
+  target_date: string,
+  geocodeCache: Map<string, Awaited<ReturnType<typeof geocodeCity>>>
+): Promise<{ row?: Record<string, unknown>; error?: string }> {
+  let geo = geocodeCache.get(city_name);
+  if (geo === undefined) {
+    geo = await geocodeCity(city_name);
+    geocodeCache.set(city_name, geo);
+  }
+  if (!geo) {
+    return { error: `Geocode failed: ${city_name} (${target_date})` };
+  }
+
+  const isUS = geo.countryCode === 'US';
+  let tempC: number | null = null;
+  let dataSource = '';
+  let confidenceSource = '';
+  let stdDev: number | null = null;
+
+  if (isUS) {
+    const tempF = await fetchNWSTemp(geo.lat, geo.lon, target_date);
+    if (tempF !== null) {
+      tempC = ((tempF - 32) * 5) / 9;
+      dataSource = 'NWS';
+      confidenceSource = 'forecast_consistency';
+    }
+  }
+
+  if (tempC === null) {
+    const result = await fetchOpenMeteoTemp(geo.lat, geo.lon, target_date);
+    if (!result) {
+      return { error: `Weather fetch failed (both NWS & Open-Meteo): ${city_name} (${target_date})` };
+    }
+    tempC = result.temp;
+    stdDev = result.stdDev;
+    dataSource = 'OPEN_METEO';
+    confidenceSource = 'ensemble_stddev';
+  }
+
+  const confidenceScore = stdDev !== null
+    ? stdDev < 0.5 ? 'HIGH' : stdDev < 1.5 ? 'MEDIUM' : 'LOW'
+    : 'MEDIUM';
+
+  return {
+    row: {
+      city_name,
+      target_date,
+      predicted_temp: Number(tempC.toFixed(1)),
+      temp_std_dev: stdDev,
+      confidence_score: confidenceScore,
+      data_source: dataSource,
+      confidence_source: confidenceSource,
+      updated_at: new Date().toISOString(),
+    },
+  };
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -70,54 +130,26 @@ export async function GET(req: Request) {
 
   const errors: string[] = [];
   const rows: Record<string, unknown>[] = [];
+  // Same city often recurs across several target_dates — cache geocode per
+  // city so we don't redo the same lookup dozens of times.
+  const geocodeCache = new Map<string, Awaited<ReturnType<typeof geocodeCity>>>();
 
-  for (const { city_name, target_date } of uniqueKeys.values()) {
-    const geo = await geocodeCity(city_name);
-    if (!geo) {
-      errors.push(`Geocode failed: ${city_name} (${target_date})`);
-      continue;
+  // Sequentially awaiting every city/date combo one at a time (with each one
+  // needing 1-3 network round trips) doesn't scale past a handful of markets
+  // and was blowing past the cron runner's timeout once fetch-markets started
+  // returning the full ~135 active city/date combos. Run in small concurrent
+  // batches instead to keep wall-clock time bounded.
+  const keys = Array.from(uniqueKeys.values());
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+    const batch = keys.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(({ city_name, target_date }) => processOne(city_name, target_date, geocodeCache))
+    );
+    for (const r of results) {
+      if (r.error) errors.push(r.error);
+      if (r.row) rows.push(r.row);
     }
-
-    const isUS = geo.countryCode === 'US';
-    let tempC: number | null = null;
-    let dataSource: string = '';
-    let confidenceSource: string = '';
-    let stdDev: number | null = null;
-
-    if (isUS) {
-      const tempF = await fetchNWSTemp(geo.lat, geo.lon, target_date);
-      if (tempF !== null) {
-        tempC = ((tempF - 32) * 5) / 9;
-        dataSource = 'NWS';
-        confidenceSource = 'forecast_consistency';
-      }
-    }
-
-    if (tempC === null) {
-      const result = await fetchOpenMeteoTemp(geo.lat, geo.lon, target_date);
-      if (!result) {
-        errors.push(`Weather fetch failed (both NWS & Open-Meteo): ${city_name} (${target_date})`);
-        continue;
-      }
-      tempC = result.temp;
-      stdDev = result.stdDev;
-      dataSource = 'OPEN_METEO';
-      confidenceSource = 'ensemble_stddev';
-    }
-
-    const confidenceScore = stdDev !== null
-      ? stdDev < 0.5 ? 'HIGH' : stdDev < 1.5 ? 'MEDIUM' : 'LOW'
-      : 'MEDIUM';
-      rows.push({
-      city_name,
-      target_date,
-      predicted_temp: Number(tempC.toFixed(1)),
-      temp_std_dev: stdDev,
-      confidence_score: confidenceScore,
-      data_source: dataSource,
-      confidence_source: confidenceSource,
-      updated_at: new Date().toISOString(),
-    });
   }
 
   let upserted = 0;
