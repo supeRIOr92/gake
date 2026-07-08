@@ -7,7 +7,7 @@ interface PolymarketMarket {
   id: string;
   conditionId: string;
   question: string;
-  outcomePrices: string;
+  outcomePrices?: string;
   closed: boolean;
   createdAt: string;
 }
@@ -52,7 +52,12 @@ export async function GET(req: Request) {
   const events = await fetchAllEvents();
 
   const errors: string[] = [];
-  const rows: Record<string, unknown>[] = [];
+  // Keyed by polymarket_id to dedupe: the paginated search API can return the
+  // same market on more than one page (results shift slightly between
+  // requests since the underlying data is live), and a duplicate id in the
+  // same upsert batch makes Postgres reject the ENTIRE batch with
+  // "ON CONFLICT DO UPDATE command cannot affect row a second time".
+  const rowsById = new Map<string, Record<string, unknown>>();
 
   for (const event of events) {
     const parsed = parseCityAndDate(event.title);
@@ -66,6 +71,10 @@ export async function GET(req: Request) {
     }
 
     for (const market of event.markets) {
+      // Illiquid markets (volume 0) omit outcomePrices entirely — skip them,
+      // there's no price to record and nothing actionable to trade.
+      if (!market.outcomePrices) continue;
+
       let prices: string[];
       try {
         prices = JSON.parse(market.outcomePrices);
@@ -75,7 +84,7 @@ export async function GET(req: Request) {
       }
       const [yesPrice, noPrice] = prices.map(Number);
 
-      rows.push({
+      rowsById.set(market.id, {
         city_name: parsed.city,
         target_date: targetDate.toISOString().split('T')[0],
         polymarket_id: market.id,
@@ -89,6 +98,8 @@ export async function GET(req: Request) {
       });
     }
   }
+
+  const rows = Array.from(rowsById.values());
 
   let upserted = 0;
   if (rows.length > 0) {
