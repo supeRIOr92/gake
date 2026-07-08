@@ -134,15 +134,15 @@ export async function GET(req: Request) {
       continue;
     }
 
-    // Skip events where any bucket price is already at an extreme (>=0.98 or <=0.02).
-    // A weather market can converge to a near-certain outcome (actual temp already
-    // observed) well before Polymarket flips its `closed` flag — at that point the
-    // package is no longer actionable (entry price ~1.00 = no real profit, only fees),
-    // so we don't want to generate a misleading signal for it.
-    const isDecided = parsedMarkets.some(
-      (m) => m.current_yes_price >= 0.98 || m.current_yes_price <= 0.02
-    );
-    if (isDecided) {
+    // Skip events where the outcome is already effectively decided: the highest
+    // YES price across all buckets is what tracks certainty here, since a
+    // multi-bucket temperature market ALWAYS has several near-0 buckets at the
+    // tails (e.g. "85F or below") even while the event is fully live — that's
+    // normal and does not mean the market is decided. Only the max price
+    // converging to ~1 (one bucket essentially locked in) means the actual
+    // temp has been observed and the market is no longer actionable.
+    const maxYesPrice = Math.max(...parsedMarkets.map((m) => m.current_yes_price));
+    if (maxYesPrice >= 0.98) {
       errors.push(`Skipped, market already effectively decided: ${key}`);
       continue;
     }

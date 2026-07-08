@@ -1,63 +1,47 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-interface Market {
+const SEARCH_API = 'https://gamma-api.polymarket.com/public-search';
+
+interface PolymarketMarket {
   id: string;
-  city_name: string;
-  target_date: string;
-  polymarket_id: string;
+  conditionId: string;
   question: string;
-  current_yes_price: number;
-  current_no_price: number;
+  outcomePrices?: string;
+  closed: boolean;
+  createdAt: string;
 }
 
-interface TempRange {
-  min: number;
-  max: number;
-  unit: 'F' | 'C';
+interface PolymarketEvent {
+  title: string;
+  markets: PolymarketMarket[];
 }
 
-function parseTempRange(question: string): TempRange | null {
-  const below = question.match(/(-?\d+(?:\.\d+)?)\s*°\s*([FC])\s*or below/i);
-  if (below) return { min: -Infinity, max: parseFloat(below[1]), unit: below[2].toUpperCase() as 'F' | 'C' };
+function parseCityAndDate(eventTitle: string): { city: string; date: string } | null {
+  const match = eventTitle.match(/Highest temperature in (.+?) on (.+?)\??$/i);
+  if (!match) return null;
+  return { city: match[1].trim(), date: match[2].trim() };
+}
 
-  const above = question.match(/(-?\d+(?:\.\d+)?)\s*°\s*([FC])\s*or above/i);
-  if (above) return { min: parseFloat(above[1]), max: Infinity, unit: above[2].toUpperCase() as 'F' | 'C' };
-
-  const between = question.match(/between\s*(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\s*°\s*([FC])/i);
-  if (between) return { min: parseFloat(between[1]), max: parseFloat(between[2]), unit: between[3].toUpperCase() as 'F' | 'C' };
-
-  const exact = question.match(/be\s*(-?\d+(?:\.\d+)?)\s*°\s*([FC])\s*on/i);
-  if (exact) {
-    const v = parseFloat(exact[1]);
-    return { min: v, max: v, unit: exact[2].toUpperCase() as 'F' | 'C' };
+// The public-search API caps each response at ~50 events regardless of
+// limit_per_type and requires paginating via `page` to get the rest — without
+// this, many cities (whichever page they happen to land on) never get fetched
+// at all, silently starving calculate-signals of active markets for them.
+async function fetchAllEvents(): Promise<PolymarketEvent[]> {
+  const events: PolymarketEvent[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(
+      `${SEARCH_API}?q=highest%20temperature&events_status=active&limit_per_type=100&page=${page}`
+    );
+    if (!res.ok) break;
+    const data = await res.json();
+    const pageEvents: PolymarketEvent[] = data.events || [];
+    if (pageEvents.length === 0) break;
+    events.push(...pageEvents);
+    if (pageEvents.length < 50) break;
   }
-  return null;
+  return events;
 }
-
-function toCelsius(value: number, unit: 'F' | 'C'): number {
-  if (!isFinite(value)) return value;
-  return unit === 'F' ? ((value - 32) * 5) / 9 : value;
-}
-
-function distanceToRange(temp: number, minC: number, maxC: number): number {
-  if (temp >= minC && temp <= maxC) return 0;
-  if (temp < minC) return minC - temp;
-  return temp - maxC;
-}
-
-// Weights for the bucket-selection composite score. Validated via out-of-sample
-// backtest (259 real settled events across 9 cities, 60/40 train/test split):
-// forecast-distance score (0.6) + whale NO-avoidance score (0.2) beats a pure
-// forecast-only baseline on the same held-out test set — same win rate, but
-// average ROI roughly 2x higher (+18.29% vs +8.08%). Historical/climatology
-// was also tested (as a vote, as a confidence filter, as a composite weight
-// at multiple recency windows, and as a pure tiebreaker) and consistently
-// failed to add value or reversed direction between train/test splits — it is
-// intentionally NOT included here. See memory/2026-07-07.md for full backtest
-// methodology and results.
-const FORECAST_WEIGHT = 0.6;
-const WHALE_NO_AVOIDANCE_WEIGHT = 0.2;
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
@@ -65,178 +49,69 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: verifiedCities, error: vErr } = await supabaseAdmin
-    .from('city_station_map')
-    .select('city_name')
-    .eq('is_verified', true);
-  if (vErr) return NextResponse.json({ error: vErr.message }, { status: 500 });
-
-  const verifiedBases = new Set(
-    (verifiedCities || []).map((c: { city_name: string }) => c.city_name.split(',')[0].trim().toLowerCase())
-  );
-
-  const { data: markets, error: mErr } = await supabaseAdmin
-    .from('markets')
-    .select('*')
-    .eq('status', 'active');
-  if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
-
-  // Pull recent whale activity for the NO-avoidance signal: for each market, how
-  // much $ has whale-tier money (>=$500, tracked by fetch-wallet-activity) bet on
-  // the NO side. A bucket that whales are NOT betting NO on is a mild positive
-  // signal for that bucket being the outcome (whales avoid betting against likely winners).
-  const { data: activity, error: aErr } = await supabaseAdmin
-    .from('wallet_activity')
-    .select('market_id, side, size_usd');
-  if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 });
-
-  const whaleNoCostByMarket = new Map<string, number>();
-  for (const a of (activity || []) as { market_id: string; side: string; size_usd: number }[]) {
-    if (a.side !== 'NO') continue;
-    whaleNoCostByMarket.set(a.market_id, (whaleNoCostByMarket.get(a.market_id) || 0) + a.size_usd);
-  }
-
-  const events = new Map<string, Market[]>();
-  for (const m of (markets || []) as Market[]) {
-    const key = `${m.city_name}|${m.target_date}`;
-    if (!events.has(key)) events.set(key, []);
-    events.get(key)!.push(m);
-  }
+  const events = await fetchAllEvents();
 
   const errors: string[] = [];
-  const signalsToInsert: Record<string, unknown>[] = [];
+  // Keyed by polymarket_id to dedupe: the paginated search API can return the
+  // same market on more than one page (results shift slightly between
+  // requests since the underlying data is live), and a duplicate id in the
+  // same upsert batch makes Postgres reject the ENTIRE batch with
+  // "ON CONFLICT DO UPDATE command cannot affect row a second time".
+  const rowsById = new Map<string, Record<string, unknown>>();
 
-  for (const [key, eventMarkets] of events) {
-    const [cityName, targetDate] = key.split('|');
+  for (const event of events) {
+    const parsed = parseCityAndDate(event.title);
+    if (!parsed) continue;
 
-    const cityBase = cityName.split(',')[0].trim().toLowerCase();
-    if (!verifiedBases.has(cityBase)) continue;
-
-    const { data: forecast } = await supabaseAdmin
-      .from('weather_forecasts')
-      .select('predicted_temp')
-      .eq('city_name', cityName)
-      .eq('target_date', targetDate)
-      .maybeSingle();
-
-    if (!forecast) {
-      errors.push(`No forecast: ${key}`);
-      continue;
-    }
-    const predictedTemp = forecast.predicted_temp;
-
-    const parsedMarkets = eventMarkets
-      .map((m) => ({ ...m, range: parseTempRange(m.question) }))
-      .filter((m): m is Market & { range: TempRange } => m.range !== null);
-
-    if (parsedMarkets.length < 2) {
-      errors.push(`Not enough parsable buckets: ${key}`);
+    const yearGuess = new Date().getFullYear();
+    const targetDate = new Date(`${parsed.date}, ${yearGuess}`);
+    if (isNaN(targetDate.getTime())) {
+      errors.push(`Bad date parse: ${parsed.date}`);
       continue;
     }
 
-    // Skip events where the outcome is already effectively decided: the highest
-    // YES price across all buckets is what tracks certainty here, since a
-    // multi-bucket temperature market ALWAYS has several near-0 buckets at the
-    // tails (e.g. "85F or below") even while the event is fully live — that's
-    // normal and does not mean the market is decided. Only the max price
-    // converging to ~1 (one bucket essentially locked in) means the actual
-    // temp has been observed and the market is no longer actionable.
-    const maxYesPrice = Math.max(...parsedMarkets.map((m) => m.current_yes_price));
-    if (maxYesPrice >= 0.98) {
-      errors.push(`Skipped, market already effectively decided: ${key}`);
-      continue;
-    }
+    for (const market of event.markets) {
+      // Illiquid markets (volume 0) omit outcomePrices entirely — skip them,
+      // there's no price to record and nothing actionable to trade.
+      if (!market.outcomePrices) continue;
 
-    // --- Composite bucket-selection score ---
-    // 1. Forecast score: closer to the predicted temp = higher score (1 at distance 0).
-    const distances = parsedMarkets.map((m) =>
-      distanceToRange(predictedTemp, toCelsius(m.range.min, m.range.unit), toCelsius(m.range.max, m.range.unit))
-    );
-    const maxDistance = Math.max(...distances) || 1;
-
-    // 2. Whale NO-avoidance score: buckets whales have NOT bet NO on score higher.
-    const noCosts = parsedMarkets.map((m) => whaleNoCostByMarket.get(m.id) || 0);
-    const maxNoCost = Math.max(...noCosts);
-
-    let targetBucket = parsedMarkets[0];
-    let bestScore = -Infinity;
-    parsedMarkets.forEach((m, i) => {
-      const forecastScore = 1 - distances[i] / maxDistance;
-      const whaleNoScore = maxNoCost > 0 ? 1 - noCosts[i] / maxNoCost : 0.5;
-      const combined = FORECAST_WEIGHT * forecastScore + WHALE_NO_AVOIDANCE_WEIGHT * whaleNoScore;
-      if (combined > bestScore) {
-        bestScore = combined;
-        targetBucket = m;
+      let prices: string[];
+      try {
+        prices = JSON.parse(market.outcomePrices);
+      } catch {
+        errors.push(`Failed to parse prices for ${market.id}`);
+        continue;
       }
-    });
+      const [yesPrice, noPrice] = prices.map(Number);
 
-    const otherMarkets = parsedMarkets.filter((m) => m.id !== targetBucket.id);
-    let noCandidates = otherMarkets.filter(
-      (m) => m.current_no_price >= 0.55 && m.current_no_price <= 0.85
-    );
-    if (noCandidates.length === 0) {
-      noCandidates = [...otherMarkets]
-        .sort((a, b) => Math.abs(a.current_no_price - 0.72) - Math.abs(b.current_no_price - 0.72))
-        .slice(0, 3);
+      rowsById.set(market.id, {
+        city_name: parsed.city,
+        target_date: targetDate.toISOString().split('T')[0],
+        polymarket_id: market.id,
+        condition_id: market.conditionId,
+        question: market.question,
+        current_yes_price: yesPrice,
+        current_no_price: noPrice,
+        status: market.closed ? 'settled' : 'active',
+        opened_at: market.createdAt,
+        updated_at: new Date().toISOString(),
+      });
     }
-    if (noCandidates.length === 0) {
-      errors.push(`No NO candidates: ${key}`);
-      continue;
-    }
-
-    const YES_CAP_PCT = 30;
-    const NO_BUDGET_PCT = 70;
-    const noSharePct = Math.round(NO_BUDGET_PCT / noCandidates.length);
-
-    const strategyPackage = {
-      positions: [
-        {
-          side: 'YES',
-          question: targetBucket.question,
-          polymarket_id: targetBucket.polymarket_id,
-          entry_price: targetBucket.current_yes_price,
-          allocation_pct: YES_CAP_PCT,
-        },
-        ...noCandidates.map((m) => ({
-          side: 'NO',
-          question: m.question,
-          polymarket_id: m.polymarket_id,
-          entry_price: m.current_no_price,
-          allocation_pct: noSharePct,
-        })),
-      ],
-    };
-
-    const baselineProb = 1 / parsedMarkets.length;
-    const netGap = Number(((baselineProb - targetBucket.current_yes_price) * 100).toFixed(2));
-
-    let signalStatus: string;
-    if (targetBucket.current_yes_price < 0.35 && netGap > 5) {
-      signalStatus = 'GAP_FOUND';
-    } else if (targetBucket.current_yes_price >= 0.35 && targetBucket.current_yes_price <= 0.6) {
-      signalStatus = 'FAIR_PRICED';
-    } else {
-      signalStatus = 'NEUTRAL';
-    }
-
-    signalsToInsert.push({
-      market_id: targetBucket.id,
-      net_gap: netGap,
-      signal_status: signalStatus,
-      strategy_package: strategyPackage,
-      is_premium: false,
-    });
   }
 
-  let inserted = 0;
-  if (signalsToInsert.length > 0) {
-    const { error } = await supabaseAdmin.from('gake_signals').insert(signalsToInsert);
+  const rows = Array.from(rowsById.values());
+
+  let upserted = 0;
+  if (rows.length > 0) {
+    const { error } = await supabaseAdmin
+      .from('markets')
+      .upsert(rows, { onConflict: 'polymarket_id' });
     if (error) {
       errors.push(error.message);
     } else {
-      inserted = signalsToInsert.length;
+      upserted = rows.length;
     }
   }
 
-  return NextResponse.json({ inserted, errors, totalEvents: events.size });
+  return NextResponse.json({ upserted, errors, totalEvents: events.length });
 }
