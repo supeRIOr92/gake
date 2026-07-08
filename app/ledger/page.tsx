@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import RoiChart from "@/components/RoiChart";
+import LedgerTable from "@/components/LedgerTable";
 
 export const revalidate = 300;
 
@@ -40,8 +41,6 @@ export default async function LedgerPage() {
     cumulative += r.net_pnl_pct;
     return { date: r.target_date, cumulative: Number(cumulative.toFixed(2)) };
   });
-
-  const displayList = [...resolved].reverse();
 
   return (
     <div className="max-w-5xl mx-auto px-5 sm:px-10 py-8">
@@ -93,58 +92,7 @@ export default async function LedgerPage() {
         <RoiChart data={chartData} />
       </div>
 
-      <div className="rounded-2xl border border-[color:var(--border)] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-black/20 text-[color:var(--text-faint)] text-[11px] font-semibold uppercase">
-            <tr>
-              <th className="text-left px-4 py-3">City</th>
-              <th className="text-left px-4 py-3">Date</th>
-              <th className="text-right px-4 py-3">Net ROI</th>
-              <th className="text-right px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayList.map((r) => (
-              <tr key={r.id} className="border-t border-[color:var(--border)]">
-                <td className="px-4 py-3 font-medium">{r.city_name}</td>
-                <td className="px-4 py-3 text-[color:var(--text-faint)] font-mono text-xs">
-                  {r.target_date}
-                </td>
-                <td
-                  className={`px-4 py-3 text-right font-mono ${
-                    r.net_pnl_pct >= 0
-                      ? "text-[color:var(--green)]"
-                      : "text-[color:var(--red)]"
-                  }`}
-                >
-                  {r.net_pnl_pct >= 0 ? "+" : ""}
-                  {r.net_pnl_pct}%
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <span
-                    className={`text-[10px] font-bold uppercase font-mono px-2.5 py-1 rounded-full ${
-                      r.result_status === "SUCCESS"
-                        ? "text-[color:var(--green)] bg-[rgba(126,232,184,0.12)]"
-                        : r.result_status === "DEFENDED"
-                        ? "text-[#f2c879] bg-[rgba(242,200,121,0.12)]"
-                        : "text-[color:var(--red)] bg-[rgba(242,135,159,0.12)]"
-                    }`}
-                  >
-                    {r.result_status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {displayList.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-[color:var(--text-faint)]">
-                  No resolved events yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <LedgerTable resolved={resolved} />
     </div>
   );
 }
