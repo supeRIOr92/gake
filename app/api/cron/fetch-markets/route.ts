@@ -23,20 +23,33 @@ function parseCityAndDate(eventTitle: string): { city: string; date: string } | 
   return { city: match[1].trim(), date: match[2].trim() };
 }
 
+// The public-search API caps each response at ~50 events regardless of
+// limit_per_type and requires paginating via `page` to get the rest — without
+// this, many cities (whichever page they happen to land on) never get fetched
+// at all, silently starving calculate-signals of active markets for them.
+async function fetchAllEvents(): Promise<PolymarketEvent[]> {
+  const events: PolymarketEvent[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(
+      `${SEARCH_API}?q=highest%20temperature&events_status=active&limit_per_type=100&page=${page}`
+    );
+    if (!res.ok) break;
+    const data = await res.json();
+    const pageEvents: PolymarketEvent[] = data.events || [];
+    if (pageEvents.length === 0) break;
+    events.push(...pageEvents);
+    if (pageEvents.length < 50) break;
+  }
+  return events;
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const res = await fetch(
-    `${SEARCH_API}?q=highest%20temperature&events_status=active&limit_per_type=100`
-  );
-  if (!res.ok) {
-    return NextResponse.json({ error: 'Failed to fetch Polymarket events' }, { status: 502 });
-  }
-  const data = await res.json();
-  const events: PolymarketEvent[] = data.events || [];
+  const events = await fetchAllEvents();
 
   const errors: string[] = [];
   const rows: Record<string, unknown>[] = [];
