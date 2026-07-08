@@ -25,9 +25,9 @@ export default function AboutPage() {
           <p>
             Each weather market on Polymarket resolves based on the actual highest
             temperature recorded on a given day, split into narrow buckets (e.g. &quot;94-95°F&quot;,
-            &quot;96-97°F&quot;). GAKE compares the market&apos;s current odds against a live weather
-            forecast for that city and date. When the odds look mispriced relative to the
-            forecast, a <span className="text-[color:var(--green)]">GAP FOUND</span> badge appears.
+            &quot;96-97°F&quot;). GAKE picks a likely bucket and builds a package around it. When a
+            package is ready, a <span className="text-[color:var(--purple-bright)]">HEDGED</span> badge
+            appears, showing the package&apos;s Best Case and Worst Case ROI.
           </p>
           <p>
             Instead of betting everything on one exact temperature, GAKE builds a small
@@ -45,7 +45,7 @@ export default function AboutPage() {
               Example — Houston, July 6
             </p>
             <p className="mb-1.5">
-              Forecast says Houston will likely hit 98-99°F. GAKE builds this package:
+              GAKE expects Houston to likely hit 98-99°F. It builds this package:
             </p>
             <ul className="space-y-1 font-mono text-[12px]">
               <li>
@@ -68,7 +68,9 @@ export default function AboutPage() {
             <p className="mt-2 text-[12px]">
               If the actual high lands anywhere in the 90-102°F range, at least the YES
               position and most NO positions pay out — the package survives a forecast miss
-              of a few degrees instead of losing everything on one exact bucket.
+              of a few degrees instead of losing everything on one exact bucket. The card
+              shows both the Best Case (YES + all NO win) and Worst Case (YES loses, cheapest
+              NO loses) ROI upfront, so you know the range before entering.
             </p>
           </ExampleBox>
 

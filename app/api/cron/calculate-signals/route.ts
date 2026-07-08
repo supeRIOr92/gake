@@ -40,6 +40,25 @@ function toCelsius(value: number, unit: 'F' | 'C'): number {
   return unit === 'F' ? ((value - 32) * 5) / 9 : value;
 }
 
+function distanceToRange(temp: number, minC: number, maxC: number): number {
+  if (temp >= minC && temp <= maxC) return 0;
+  if (temp < minC) return minC - temp;
+  return temp - maxC;
+}
+
+// Weights for the bucket-selection composite score. Validated via out-of-sample
+// backtest (259 real settled events across 9 cities, 60/40 train/test split):
+// forecast-distance score (0.6) + whale NO-avoidance score (0.2) beats a pure
+// forecast-only baseline on the same held-out test set — same win rate, but
+// average ROI roughly 2x higher (+18.29% vs +8.08%). Historical/climatology
+// was also tested (as a vote, as a confidence filter, as a composite weight
+// at multiple recency windows, and as a pure tiebreaker) and consistently
+// failed to add value or reversed direction between train/test splits — it is
+// intentionally NOT included here. See memory/2026-07-07.md for full backtest
+// methodology and results.
+const FORECAST_WEIGHT = 0.6;
+const WHALE_NO_AVOIDANCE_WEIGHT = 0.2;
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -52,15 +71,30 @@ export async function GET(req: Request) {
     .eq('is_verified', true);
   if (vErr) return NextResponse.json({ error: vErr.message }, { status: 500 });
 
-const verifiedBases = new Set(
-  (verifiedCities || []).map((c: { city_name: string }) => c.city_name.split(',')[0].trim().toLowerCase())
-);
+  const verifiedBases = new Set(
+    (verifiedCities || []).map((c: { city_name: string }) => c.city_name.split(',')[0].trim().toLowerCase())
+  );
 
   const { data: markets, error: mErr } = await supabaseAdmin
     .from('markets')
     .select('*')
     .eq('status', 'active');
   if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
+
+  // Pull recent whale activity for the NO-avoidance signal: for each market, how
+  // much $ has whale-tier money (>=$500, tracked by fetch-wallet-activity) bet on
+  // the NO side. A bucket that whales are NOT betting NO on is a mild positive
+  // signal for that bucket being the outcome (whales avoid betting against likely winners).
+  const { data: activity, error: aErr } = await supabaseAdmin
+    .from('wallet_activity')
+    .select('market_id, side, size_usd');
+  if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 });
+
+  const whaleNoCostByMarket = new Map<string, number>();
+  for (const a of (activity || []) as { market_id: string; side: string; size_usd: number }[]) {
+    if (a.side !== 'NO') continue;
+    whaleNoCostByMarket.set(a.market_id, (whaleNoCostByMarket.get(a.market_id) || 0) + a.size_usd);
+  }
 
   const events = new Map<string, Market[]>();
   for (const m of (markets || []) as Market[]) {
@@ -113,25 +147,31 @@ const verifiedBases = new Set(
       continue;
     }
 
-function distanceToRange(temp: number, minC: number, maxC: number): number {
-  if (temp >= minC && temp <= maxC) return 0;
-  if (temp < minC) return minC - temp;
-  return temp - maxC;
-}
+    // --- Composite bucket-selection score ---
+    // 1. Forecast score: closer to the predicted temp = higher score (1 at distance 0).
+    const distances = parsedMarkets.map((m) =>
+      distanceToRange(predictedTemp, toCelsius(m.range.min, m.range.unit), toCelsius(m.range.max, m.range.unit))
+    );
+    const maxDistance = Math.max(...distances) || 1;
 
-let targetBucket = parsedMarkets[0];
-let minDistance = Infinity;
-for (const m of parsedMarkets) {
-  const minC = toCelsius(m.range.min, m.range.unit);
-  const maxC = toCelsius(m.range.max, m.range.unit);
-  const d = distanceToRange(predictedTemp, minC, maxC);
-  if (d < minDistance) {
-    minDistance = d;
-    targetBucket = m;
-  }
-}
+    // 2. Whale NO-avoidance score: buckets whales have NOT bet NO on score higher.
+    const noCosts = parsedMarkets.map((m) => whaleNoCostByMarket.get(m.id) || 0);
+    const maxNoCost = Math.max(...noCosts);
 
-    const otherMarkets = parsedMarkets.filter((m) => m.id !== targetBucket.id);let noCandidates = otherMarkets.filter(
+    let targetBucket = parsedMarkets[0];
+    let bestScore = -Infinity;
+    parsedMarkets.forEach((m, i) => {
+      const forecastScore = 1 - distances[i] / maxDistance;
+      const whaleNoScore = maxNoCost > 0 ? 1 - noCosts[i] / maxNoCost : 0.5;
+      const combined = FORECAST_WEIGHT * forecastScore + WHALE_NO_AVOIDANCE_WEIGHT * whaleNoScore;
+      if (combined > bestScore) {
+        bestScore = combined;
+        targetBucket = m;
+      }
+    });
+
+    const otherMarkets = parsedMarkets.filter((m) => m.id !== targetBucket.id);
+    let noCandidates = otherMarkets.filter(
       (m) => m.current_no_price >= 0.55 && m.current_no_price <= 0.85
     );
     if (noCandidates.length === 0) {

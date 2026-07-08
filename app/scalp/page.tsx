@@ -36,9 +36,13 @@ async function getScalpMarkets() {
     .not("opened_at", "is", null);
 
   const now = Date.now();
+  // Skip markets already at an extreme price (>=0.98 or <=0.02) — no real mispricing
+  // left to scalp at that point, only fees. Matches the same guard used for the
+  // Hedging Package signal.
   const markets = (marketsRaw || []).filter((m: MarketRow) => {
     const hoursOld = (now - new Date(m.opened_at!).getTime()) / 3_600_000;
-    return hoursOld < AGING_HOURS;
+    const isDecided = m.current_yes_price >= 0.98 || m.current_yes_price <= 0.02;
+    return hoursOld < AGING_HOURS && !isDecided;
   }) as MarketRow[];
 
   const marketIds = markets.map((m) => m.id);
@@ -50,7 +54,11 @@ async function getScalpMarkets() {
     .in("market_id", marketIds)
     .order("tx_time", { ascending: false });
 
-  const activity = (activityRaw || []) as ActivityRow[];
+  // Also guard on the entry price itself — a whale entry recorded at an extreme price
+  // is stale/near-certain even if the market's current price has since moved.
+  const activity = ((activityRaw || []) as ActivityRow[]).filter(
+    (a) => a.entry_price < 0.98 && a.entry_price > 0.02
+  );
   const activityByMarket = new Map<string, ActivityRow[]>();
   for (const a of activity) {
     if (!activityByMarket.has(a.market_id)) activityByMarket.set(a.market_id, []);
@@ -114,12 +122,12 @@ export default async function ScalpPage() {
       <p className="text-sm text-[color:var(--text-dim)] mb-7 leading-relaxed">
         Whale entries detected on fresh, potentially mispriced markets. Not directional
         weather bets — pure timing arbitrage. Exit manually once price re-corrects.
-        Median hold time historically ~27 hours.
+        Median hold time historically ~13 hours.
       </p>
 
       <ScalpSectionClient
         title="New Entry Radar"
-        subtitle="< 24h old — whale just entered, ranked by most recent"
+        subtitle="< 24h old — whale just entered, ranked by most recent. Entries under 8h are marked Prime Entry Window — historically where the most profitable scalps started."
         markets={fresh}
         mode="fresh"
         emptyText="No fresh whale entries detected right now."

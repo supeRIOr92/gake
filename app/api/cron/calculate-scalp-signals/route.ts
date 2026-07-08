@@ -48,10 +48,17 @@ export async function GET(req: Request) {
   const marketList = (markets || []) as MarketRow[];
   const now = Date.now();
 
-  // Only consider markets younger than STALE window — scalp signal is irrelevant otherwise
+  // Only consider markets younger than STALE window — scalp signal is irrelevant otherwise.
+  // Also skip markets already at an extreme price (>=0.98 or <=0.02): a weather market can
+  // converge to a near-certain outcome before Polymarket flips its `closed` flag, and at
+  // that point there's no real mispricing left to scalp, only fees. Backtested against
+  // real whale (onlylucknobrain) activity: entries at extreme prices never appear in that
+  // whale's actual profitable scalp trades, so this guard matches real behavior, not just
+  // a theoretical safeguard.
   const eligibleMarkets = marketList.filter((m) => {
     const hoursOld = (now - new Date(m.opened_at!).getTime()) / 3_600_000;
-    return hoursOld < AGING_HOURS;
+    const isDecided = m.current_yes_price >= 0.98 || m.current_yes_price <= 0.02;
+    return hoursOld < AGING_HOURS && !isDecided;
   });
 
   const marketIds = eligibleMarkets.map((m) => m.id);
@@ -68,8 +75,15 @@ export async function GET(req: Request) {
     activity = (activityRows || []) as ActivityRow[];
   }
 
+  // Also guard on the entry price itself — a whale entry recorded at an extreme price
+  // (>=0.98 or <=0.02) is stale/near-certain even if the market's current price has since
+  // moved, so it shouldn't count as a genuine mispricing entry.
+  const genuineActivity = activity.filter(
+    (a) => a.entry_price < 0.98 && a.entry_price > 0.02
+  );
+
   const activityByMarket = new Map<string, ActivityRow[]>();
-  for (const a of activity) {
+  for (const a of genuineActivity) {
     if (!activityByMarket.has(a.market_id)) activityByMarket.set(a.market_id, []);
     activityByMarket.get(a.market_id)!.push(a);
   }

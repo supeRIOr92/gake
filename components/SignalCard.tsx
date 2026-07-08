@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Modal from "./Modal";
+import { computeRoiRange } from "@/lib/roi";
 
 interface Position {
   side: "YES" | "NO";
@@ -27,17 +28,8 @@ interface Market {
   current_yes_price: number;
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  GAP_FOUND: "pos",
-  FAIR_PRICED: "neg",
-  NEUTRAL: "neu",
-};
-
-const PILL_CLASS: Record<string, string> = {
-  pos: "text-[color:var(--green)] bg-[rgba(126,232,184,0.12)]",
-  neg: "text-[color:var(--red)] bg-[rgba(242,135,159,0.12)]",
-  neu: "text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.12)]",
-};
+const PILL_CLASS =
+  "text-[color:var(--purple-bright)] bg-[rgba(171,159,242,0.14)]";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -64,8 +56,7 @@ export default function SignalCard({
   market: Market;
 }) {
   const [open, setOpen] = useState(false);
-  const badgeKind = STATUS_STYLE[signal.signal_status] || "neu";
-  const gapPositive = signal.net_gap >= 0;
+  const { bestRoi, worstRoi } = computeRoiRange(signal.strategy_package.positions);
 
   return (
     <>
@@ -81,23 +72,28 @@ export default function SignalCard({
             </div>
           </div>
           <span
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${PILL_CLASS[badgeKind]}`}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${PILL_CLASS}`}
           >
-            {signal.signal_status.replace("_", " ")}
+            HEDGED
           </span>
         </div>
 
-        <div className="my-4 p-4 rounded-2xl bg-black/20">
-          <div className="text-[11px] font-semibold text-[color:var(--text-faint)] mb-1">
-            Net Gap
+        <div className="my-4 p-4 rounded-2xl bg-black/20 flex gap-4">
+          <div className="flex-1">
+            <div className="text-[10.5px] font-semibold text-[color:var(--text-faint)] mb-1">
+              Best Case
+            </div>
+            <div className="font-mono text-[22px] font-semibold leading-none text-[color:var(--green)]">
+              +{bestRoi}%
+            </div>
           </div>
-          <div
-            className={`font-mono text-[28px] font-semibold leading-none ${
-              gapPositive ? "text-[color:var(--green)]" : "text-[color:var(--red)]"
-            }`}
-          >
-            {gapPositive ? "+" : ""}
-            {signal.net_gap}%
+          <div className="flex-1">
+            <div className="text-[10.5px] font-semibold text-[color:var(--text-faint)] mb-1">
+              Worst Case
+            </div>
+            <div className="font-mono text-[22px] font-semibold leading-none text-[color:var(--red)]">
+              {worstRoi}%
+            </div>
           </div>
         </div>
 
@@ -144,17 +140,28 @@ export default function SignalCard({
           </button>
         </div>
 
-        <div className="my-4.5 p-4 rounded-2xl bg-black/20">
-          <div className="text-[11px] font-semibold text-[color:var(--text-faint)] mb-1">
-            Net Gap
+        <div className="my-4.5 p-4 rounded-2xl bg-black/20 flex gap-4">
+          <div className="flex-1">
+            <div className="text-[11px] font-semibold text-[color:var(--text-faint)] mb-1">
+              Best Case ROI
+            </div>
+            <div className="font-mono text-[26px] font-semibold leading-none text-[color:var(--green)]">
+              +{bestRoi}%
+            </div>
+            <div className="text-[10.5px] text-[color:var(--text-faint)] mt-1">
+              if actual temp hits the YES bucket
+            </div>
           </div>
-          <div
-            className={`font-mono text-[30px] font-semibold leading-none ${
-              gapPositive ? "text-[color:var(--green)]" : "text-[color:var(--red)]"
-            }`}
-          >
-            {gapPositive ? "+" : ""}
-            {signal.net_gap}%
+          <div className="flex-1">
+            <div className="text-[11px] font-semibold text-[color:var(--text-faint)] mb-1">
+              Worst Case ROI
+            </div>
+            <div className="font-mono text-[26px] font-semibold leading-none text-[color:var(--red)]">
+              {worstRoi}%
+            </div>
+            <div className="text-[10.5px] text-[color:var(--text-faint)] mt-1">
+              if actual temp hits a NO bucket
+            </div>
           </div>
         </div>
 
