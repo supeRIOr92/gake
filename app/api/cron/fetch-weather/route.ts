@@ -35,19 +35,36 @@ async function fetchNWSTemp(lat: number, lon: number, targetDate: string): Promi
   return period ? period.temperature : null;
 }
 
+// Ensemble of 4 independent forecast models, averaged. Validated via 259-event
+// backtest against real settlements: ensemble MAE 1.75°F vs 2.11°F for a single
+// "best_match" model (~17% more accurate), which translated to package ROI
+// backtest improving from +16.03% to +29.18% average per event (259/259 events,
+// spanning 1 year, 8 cities). See memory/2026-07-08.md for full methodology.
+const ENSEMBLE_MODELS = ['gfs_seamless', 'ecmwf_ifs04', 'icon_seamless', 'gem_seamless'];
+
 async function fetchOpenMeteoTemp(
   lat: number,
   lon: number,
   targetDate: string
 ): Promise<{ temp: number; stdDev: number | null } | null> {
   const res = await fetch(
-    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max&timezone=auto&start_date=${targetDate}&end_date=${targetDate}`
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max&timezone=auto&start_date=${targetDate}&end_date=${targetDate}&models=${ENSEMBLE_MODELS.join(',')}`
   );
   if (!res.ok) return null;
   const data = await res.json();
-  const temp = data.daily?.temperature_2m_max?.[0];
-  if (temp === undefined || temp === null) return null;
-  return { temp, stdDev: null };
+  const daily = data.daily as Record<string, (number | null)[]> | undefined;
+  if (!daily) return null;
+
+  const values: number[] = [];
+  for (const model of ENSEMBLE_MODELS) {
+    const v = daily[`temperature_2m_max_${model}`]?.[0];
+    if (v !== undefined && v !== null) values.push(v);
+  }
+  if (values.length === 0) return null;
+
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
+  return { temp: mean, stdDev: Math.sqrt(variance) };
 }
 
 async function processOne(

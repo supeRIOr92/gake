@@ -48,18 +48,59 @@ function distanceToRange(temp: number, minC: number, maxC: number): number {
   return temp - maxC;
 }
 
-// Weights for the bucket-selection composite score. Validated via out-of-sample
-// backtest (259 real settled events across 9 cities, 60/40 train/test split):
-// forecast-distance score (0.6) + whale NO-avoidance score (0.2) beats a pure
-// forecast-only baseline on the same held-out test set — same win rate, but
-// average ROI roughly 2x higher (+18.29% vs +8.08%). Historical/climatology
-// was also tested (as a vote, as a confidence filter, as a composite weight
-// at multiple recency windows, and as a pure tiebreaker) and consistently
-// failed to add value or reversed direction between train/test splits — it is
-// intentionally NOT included here. See memory/2026-07-07.md for full backtest
-// methodology and results.
-const FORECAST_WEIGHT = 0.6;
-const WHALE_NO_AVOIDANCE_WEIGHT = 0.2;
+// Abramowitz-Stegun approximation of the error function (erf), used to compute
+// the Gaussian CDF below. Max error ~1.5e-7, more than precise enough here.
+function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const t = 1 / (1 + p * ax);
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
+  return sign * y;
+}
+
+function normalCdf(x: number, mu: number, sigma: number): number {
+  return 0.5 * (1 + erf((x - mu) / (sigma * Math.sqrt(2))));
+}
+
+// Probability mass of Normal(mu, sigma) falling within [lo, hi].
+function bucketProbability(lo: number, hi: number, mu: number, sigma: number): number {
+  const loCdf = lo === -Infinity ? 0 : normalCdf(lo, mu, sigma);
+  const hiCdf = hi === Infinity ? 1 : normalCdf(hi, mu, sigma);
+  return Math.max(0, hiCdf - loCdf);
+}
+
+// Forecast error std dev (in Celsius), fitted from 259 real settled events
+// across 9 cities (closed-bucket actual-temp reconstruction, open-ended tail
+// buckets excluded to avoid biasing the estimate). Fitted on a 60% train
+// split, validated out-of-sample on the held-out 40% test split: predicted
+// probability bins of 90-100% matched an actual 81.8% win rate, and 20-30%
+// bins matched an actual 24.2% win rate (n=11 and n=66 respectively) — the
+// mid-probability range (30-70%) had too few samples to validate reliably.
+// This replaces the old per-event-normalized composite score (which was
+// found to be structurally uninformative: the argmax bucket always scored
+// near 1.0 regardless of true confidence, since scores were normalized
+// against the max within the same event). See memory/2026-07-08.md.
+const FORECAST_ERROR_SIGMA_C = 1.95;
+
+// Small secondary adjustment: buckets whales have NOT bet NO on get a mild
+// boost. Kept as a tie-breaker/nudge only (not a probability), since this
+// signal was validated for ROI improvement, not bucket-selection accuracy.
+const WHALE_NO_AVOIDANCE_NUDGE = 0.05;
+
+// Per-city forecast bias correction (Celsius), subtracted from the raw
+// forecast before computing bucket probabilities. Fitted from real settled
+// events for cities where a consistent, non-random directional bias was
+// found (LA consistently over-forecasts hot by +3.59C; Chicago consistently
+// under-forecasts by -1.51C). Cities not listed here had no significant bias
+// detected and are left uncorrected (0). This is deliberately NOT applied to
+// cities without historical settlement data to verify against — see
+// memory/2026-07-08.md.
+const CITY_BIAS_CORRECTION_C: Record<string, number> = {
+  'los angeles': 3.59,
+  'chicago': -1.51,
+};
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
@@ -128,12 +169,15 @@ export async function GET(req: Request) {
     const cityBase = cityName.split(',')[0].trim().toLowerCase();
     if (!verifiedBases.has(cityBase)) continue;
 
-    const predictedTemp = forecastByKey.get(key);
+    const rawPredictedTemp = forecastByKey.get(key);
 
-    if (predictedTemp === undefined) {
+    if (rawPredictedTemp === undefined) {
       errors.push(`No forecast: ${key}`);
       continue;
     }
+
+    const biasCorrection = CITY_BIAS_CORRECTION_C[cityBase] || 0;
+    const predictedTemp = rawPredictedTemp - biasCorrection;
 
     const parsedMarkets = eventMarkets
       .map((m) => ({ ...m, range: parseTempRange(m.question) }))
@@ -157,38 +201,50 @@ export async function GET(req: Request) {
       continue;
     }
 
-    // --- Composite bucket-selection score ---
-    // 1. Forecast score: closer to the predicted temp = higher score (1 at distance 0).
-    const distances = parsedMarkets.map((m) =>
-      distanceToRange(predictedTemp, toCelsius(m.range.min, m.range.unit), toCelsius(m.range.max, m.range.unit))
+    // --- Bucket-selection: Gaussian probability model ---
+    // Each bucket's true probability = area under a Normal(predictedTemp, sigma)
+    // curve within that bucket's temp range. Unlike the old per-event-normalized
+    // score, this is comparable ACROSS events (a 0.8 here means the same thing
+    // as a 0.8 on a different event/city), because it isn't rescaled relative
+    // to sibling buckets.
+    const rawProbs = parsedMarkets.map((m) =>
+      bucketProbability(
+        toCelsius(m.range.min, m.range.unit),
+        toCelsius(m.range.max, m.range.unit),
+        predictedTemp,
+        FORECAST_ERROR_SIGMA_C
+      )
     );
-    const maxDistance = Math.max(...distances) || 1;
-
-    // 2. Whale NO-avoidance score: buckets whales have NOT bet NO on score higher.
+    const totalProb = rawProbs.reduce((a, b) => a + b, 0) || 1;
     const noCosts = parsedMarkets.map((m) => whaleNoCostByMarket.get(m.id) || 0);
     const maxNoCost = Math.max(...noCosts);
 
     let targetBucket = parsedMarkets[0];
     let bestScore = -Infinity;
+    let targetConfidence = 0;
     parsedMarkets.forEach((m, i) => {
-      const forecastScore = 1 - distances[i] / maxDistance;
+      const probability = rawProbs[i] / totalProb;
       const whaleNoScore = maxNoCost > 0 ? 1 - noCosts[i] / maxNoCost : 0.5;
-      const combined = FORECAST_WEIGHT * forecastScore + WHALE_NO_AVOIDANCE_WEIGHT * whaleNoScore;
+      const combined = probability + WHALE_NO_AVOIDANCE_NUDGE * whaleNoScore;
       if (combined > bestScore) {
         bestScore = combined;
         targetBucket = m;
+        targetConfidence = probability;
       }
     });
 
     const otherMarkets = parsedMarkets.filter((m) => m.id !== targetBucket.id);
-    let noCandidates = otherMarkets.filter(
+    // Always aim for 3 NO positions (hedge coverage). Prefer buckets priced in the
+    // 0.55-0.85 "sweet spot" first, then top up any remaining slots with the
+    // next-closest-to-0.72 buckets not already picked — a partial sweet-spot match
+    // (e.g. only 1 bucket in range) must NOT stop at 1, it must still fill up to 3.
+    const inSweetSpot = otherMarkets.filter(
       (m) => m.current_no_price >= 0.55 && m.current_no_price <= 0.85
     );
-    if (noCandidates.length === 0) {
-      noCandidates = [...otherMarkets]
-        .sort((a, b) => Math.abs(a.current_no_price - 0.72) - Math.abs(b.current_no_price - 0.72))
-        .slice(0, 3);
-    }
+    const restSortedByCloseness = otherMarkets
+      .filter((m) => !inSweetSpot.some((s) => s.id === m.id))
+      .sort((a, b) => Math.abs(a.current_no_price - 0.72) - Math.abs(b.current_no_price - 0.72));
+    const noCandidates = [...inSweetSpot, ...restSortedByCloseness].slice(0, 3);
     if (noCandidates.length === 0) {
       errors.push(`No NO candidates: ${key}`);
       continue;
@@ -199,6 +255,7 @@ export async function GET(req: Request) {
     const noSharePct = Math.round(NO_BUDGET_PCT / noCandidates.length);
 
     const strategyPackage = {
+      confidence: Number(targetConfidence.toFixed(3)),
       positions: [
         {
           side: 'YES',
