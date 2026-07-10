@@ -43,6 +43,15 @@ interface ResolvedRow {
   result_status: string;
 }
 
+
+// Detect the display unit (°F/°C) each city's Polymarket questions use, so
+// "current conditions" can mirror the same unit instead of always showing
+// Celsius (the unit weather_forecasts/city_current_weather store internally).
+function detectCityUnit(question: string): "F" | "C" | null {
+  const match = question.match(/°\s*([FC])/i);
+  return match ? (match[1].toUpperCase() as "F" | "C") : null;
+}
+
 // Package Win Probability is the primary ranking signal now (replaces sorting
 // by raw Best Case ROI). Rationale: ranking by upside alone can surface a
 // package that GAKE itself has low confidence in, just because its payout if
@@ -94,6 +103,20 @@ async function getData() {
 
   const currentWeather = (currentWeatherRaw || []) as CurrentWeatherRow[];
 
+  // Map each city to the °F/°C unit its own Polymarket questions use, so
+  // "current conditions" displays in the same unit as that city's market
+  // instead of always Celsius.
+  const { data: unitMarketsRaw } = await supabase
+    .from("markets")
+    .select("city_name, question");
+
+  const cityUnit = new Map<string, "F" | "C">();
+  for (const m of (unitMarketsRaw || []) as { city_name: string; question: string }[]) {
+    if (cityUnit.has(m.city_name)) continue;
+    const unit = detectCityUnit(m.question);
+    if (unit) cityUnit.set(m.city_name, unit);
+  }
+
   const { data: activityRaw } = await supabase
     .from("wallet_activity")
     .select("id, wallet_label, side, entry_price, size_usd, tx_time, markets(city_name, target_date)")
@@ -108,11 +131,11 @@ async function getData() {
 
   const resolved = (resolvedRaw || []) as ResolvedRow[];
 
-  return { signals, currentWeather, activity, resolved };
+  return { signals, currentWeather, activity, resolved, cityUnit };
 }
 
 export default async function Home() {
-  const { signals, currentWeather, activity, resolved } = await getData();
+  const { signals, currentWeather, activity, resolved, cityUnit } = await getData();
 
   const totalResolved = resolved.length;
   const successCount = resolved.filter((r) => r.result_status === "SUCCESS").length;
@@ -189,7 +212,9 @@ export default async function Home() {
                 })}
               </div>
               <span className="font-mono text-lg font-semibold text-[color:var(--foreground)]">
-                {c.current_temp_c.toFixed(1)}°C
+                {cityUnit.get(c.city_name) === "F"
+                  ? `${(c.current_temp_c * 9 / 5 + 32).toFixed(1)}°F`
+                  : `${c.current_temp_c.toFixed(1)}°C`}
               </span>
             </div>
           ))}
