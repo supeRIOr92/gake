@@ -11,7 +11,7 @@ export default function AboutPage() {
     <div className="max-w-3xl mx-auto px-5 sm:px-10 py-8">
       <div className="flex items-start gap-4 mb-6">
         <span className="text-5xl leading-none select-none" aria-hidden>
-          ☁️<span className="inline-block -ml-4 -mt-2 align-top text-2xl">🕶️</span>
+          <span className="relative inline-block">☁️<span className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl">🕶️</span></span>
         </span>
         <div>
           <h1 className="text-xl font-bold tracking-tight mb-1.5">who (or what) is GAKE?</h1>

@@ -130,7 +130,7 @@ export default async function Home() {
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-4 mb-6 max-w-2xl">
           <span className="text-5xl leading-none select-none" aria-hidden>
-            ☁️<span className="inline-block -ml-4 -mt-2 align-top text-2xl">🕶️</span>
+            <span className="relative inline-block">☁️<span className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl">🕶️</span></span>
           </span>
           <p className="text-[13.5px] text-[color:var(--text-dim)] leading-relaxed pt-1">
             GAKE watches the sky and bets on it — same forecast data, same
