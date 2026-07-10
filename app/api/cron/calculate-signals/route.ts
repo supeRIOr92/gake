@@ -23,7 +23,7 @@ function parseTempRange(question: string): TempRange | null {
   const below = question.match(/(-?\d+(?:\.\d+)?)\s*°\s*([FC])\s*or below/i);
   if (below) return { min: -Infinity, max: parseFloat(below[1]), unit: below[2].toUpperCase() as 'F' | 'C' };
 
-  const above = question.match(/(-?\d+(?:\.\d+)?)\s*°\s*([FC])\s*or above/i);
+  const above = question.match(/(-?\d+(?:\.\d+)?)\s*°\s*([FC])\s*or (?:above|higher)/i);
   if (above) return { min: parseFloat(above[1]), max: Infinity, unit: above[2].toUpperCase() as 'F' | 'C' };
 
   const between = question.match(/between\s*(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\s*°\s*([FC])/i);
