@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Modal from "./Modal";
-import type { Signal } from "./SignalCard";
+import { packageConfidenceLabel, type Signal } from "./SignalCard";
 import { computeRoiRange } from "@/lib/roi";
 
 interface Position {
@@ -46,30 +46,38 @@ export default function HeroSignalCard({
 }) {
   const [open, setOpen] = useState(false);
   const { bestRoi, worstRoi } = computeRoiRange(signal.strategy_package.positions);
+  const conf = packageConfidenceLabel(signal.strategy_package);
 
   return (
     <>
       <div
         onClick={() => setOpen(true)}
-        className="cursor-pointer relative overflow-hidden rounded-[24px] border border-[rgba(171,159,242,0.35)] bg-gradient-to-br from-[color:var(--panel-2)] via-[color:var(--panel)] to-[#150f24] p-6 sm:p-8 mb-8 hover:border-[color:var(--purple)] transition-colors"
+        className="cursor-pointer relative overflow-hidden rounded-[24px] border border-[rgba(255,225,77,0.35)] bg-gradient-to-br from-[color:var(--panel-2)] via-[color:var(--panel)] to-[#150829] p-6 sm:p-8 mb-8 hover:border-[color:var(--purple)] transition-colors"
       >
         <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-[color:var(--purple-deep)] opacity-20 blur-[70px] pointer-events-none" />
 
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1 min-w-0">
-            <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-[color:var(--purple-bright)] bg-[rgba(171,159,242,0.14)] rounded-full px-3 py-1 mb-3">
-              Top Opportunity
-            </span>
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-[color:var(--purple-bright)] bg-[rgba(255,225,77,0.14)] rounded-full px-3 py-1">
+                gake's favorite pick
+              </span>
+              {conf && (
+                <span
+                  className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${conf.className}`}
+                >
+                  {conf.text}
+                </span>
+              )}
+            </div>
             <div className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-1">
               {market.city_name}
             </div>
             <div className="font-mono text-[12px] text-[color:var(--text-faint)] mb-4">
               {market.target_date}
             </div>
-            <p className="text-[13px] text-[color:var(--text-dim)] leading-relaxed max-w-md">
-              Highest upside package live right now — a hedging package with a NO
-              side spread across other buckets, so even a wrong call stays partly
-              covered.
+            <p className="text-[13px] text-[color:var(--text-dim)] leading-relaxed max-w-md italic">
+              &quot;trust the sky.&quot; — $GAKE
             </p>
           </div>
 
@@ -115,6 +123,12 @@ export default function HeroSignalCard({
             ✕
           </button>
         </div>
+
+        {conf && (
+          <div className={`text-[11px] font-bold uppercase rounded-xl px-3.5 py-2.5 mb-4 ${conf.className}`}>
+            {conf.text}
+          </div>
+        )}
 
         <div className="my-4.5 p-4 rounded-2xl bg-black/20 flex gap-4">
           <div className="flex-1">

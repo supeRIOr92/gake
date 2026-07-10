@@ -4,7 +4,6 @@ import HeroSignalCard from "@/components/HeroSignalCard";
 import ExpandableSection from "@/components/ExpandableSection";
 import SharpMoneySidebar from "@/components/SharpMoneySidebar";
 import StatsBanner from "@/components/StatsBanner";
-import { computeRoiRange } from "@/lib/roi";
 import Link from "next/link";
 
 export const revalidate = 60;
@@ -23,10 +22,10 @@ interface SignalRow extends Signal {
   markets: MarketRow;
 }
 
-interface UncoveredRow {
+interface CurrentWeatherRow {
   city_name: string;
-  target_date: string;
-  predicted_temp: number | null;
+  current_temp_c: number;
+  observed_at: string;
 }
 
 interface ActivityRow {
@@ -42,6 +41,26 @@ interface ActivityRow {
 interface ResolvedRow {
   net_pnl_pct: number;
   result_status: string;
+}
+
+// Package Win Probability is the primary ranking signal now (replaces sorting
+// by raw Best Case ROI). Rationale: ranking by upside alone can surface a
+// package that GAKE itself has low confidence in, just because its payout if
+// it wins happens to be large — the opposite of what "gake's favorite
+// child" should mean. sigma_validated packages (9 cities with real backtest
+// history behind FORECAST_ERROR_SIGMA_C) are prioritized over unvalidated
+// ones at equal probability, since their confidence number has actually been
+// checked against real settlement outcomes.
+function rankSignals(signals: SignalRow[]): SignalRow[] {
+  return [...signals].sort((a, b) => {
+    const aValidated = a.strategy_package.sigma_validated ? 1 : 0;
+    const bValidated = b.strategy_package.sigma_validated ? 1 : 0;
+    if (aValidated !== bValidated) return bValidated - aValidated;
+
+    const aProb = a.strategy_package.package_win_probability ?? 0;
+    const bProb = b.strategy_package.package_win_probability ?? 0;
+    return bProb - aProb;
+  });
 }
 
 async function getData() {
@@ -62,41 +81,18 @@ async function getData() {
   const actionableSignals = Array.from(latestByMarket.values()).filter(
     (s) => s.markets.current_yes_price < 0.98 && s.markets.current_yes_price > 0.02
   );
-  const signals = actionableSignals.sort(
-    (a, b) =>
-      computeRoiRange(b.strategy_package.positions).bestRoi -
-      computeRoiRange(a.strategy_package.positions).bestRoi
-  );
+  const signals = rankSignals(actionableSignals);
 
-  const { data: allMarkets } = await supabase
-    .from("markets")
-    .select("city_name, target_date")
-    .eq("status", "active");
+  // Current (observed, real-time) temperature per city — intentionally
+  // independent of Polymarket market status, unlike the old "Live Weather
+  // Feed" which only ever showed forecasts for city/date combos that
+  // happened to have an active market.
+  const { data: currentWeatherRaw } = await supabase
+    .from("city_current_weather")
+    .select("city_name, current_temp_c, observed_at")
+    .order("city_name", { ascending: true });
 
-  const coveredKeys = new Set(
-    signals.map((s) => `${s.markets.city_name}|${s.markets.target_date}`)
-  );
-  const allKeys = new Map<string, { city_name: string; target_date: string }>();
-  for (const m of allMarkets || []) {
-    allKeys.set(`${m.city_name}|${m.target_date}`, m);
-  }
-  const uncoveredKeys = Array.from(allKeys.values()).filter(
-    (m) => !coveredKeys.has(`${m.city_name}|${m.target_date}`)
-  );
-
-  const { data: forecastsRaw } = await supabase
-    .from("weather_forecasts")
-    .select("city_name, target_date, predicted_temp");
-
-  const forecastByKey = new Map<string, number>();
-  for (const f of forecastsRaw || []) {
-    forecastByKey.set(`${f.city_name}|${f.target_date}`, f.predicted_temp);
-  }
-
-  const uncovered: UncoveredRow[] = uncoveredKeys.map((m) => ({
-    ...m,
-    predicted_temp: forecastByKey.get(`${m.city_name}|${m.target_date}`) ?? null,
-  }));
+  const currentWeather = (currentWeatherRaw || []) as CurrentWeatherRow[];
 
   const { data: activityRaw } = await supabase
     .from("wallet_activity")
@@ -112,11 +108,11 @@ async function getData() {
 
   const resolved = (resolvedRaw || []) as ResolvedRow[];
 
-  return { signals, uncovered, activity, resolved };
+  return { signals, currentWeather, activity, resolved };
 }
 
 export default async function Home() {
-  const { signals, uncovered, activity, resolved } = await getData();
+  const { signals, currentWeather, activity, resolved } = await getData();
 
   const totalResolved = resolved.length;
   const successCount = resolved.filter((r) => r.result_status === "SUCCESS").length;
@@ -132,21 +128,26 @@ export default async function Home() {
   return (
     <div className="max-w-[1400px] mx-auto px-5 sm:px-10 py-8 flex flex-col lg:flex-row gap-7">
       <div className="flex-1 min-w-0">
-        <p className="text-[13.5px] text-[color:var(--text-dim)] leading-relaxed mb-6 max-w-2xl">
-          GAKE scans every open weather market on Polymarket and surfaces mispricing —
-          both hedged strategy packages and whale timing signals.{" "}
-          <Link href="/about" className="text-[color:var(--purple-bright)] font-semibold">
-            How it works →
-          </Link>
-        </p>
+        <div className="flex items-start gap-4 mb-6 max-w-2xl">
+          <span className="text-5xl leading-none select-none" aria-hidden>
+            ☁️<span className="inline-block -ml-4 -mt-2 align-top text-2xl">🕶️</span>
+          </span>
+          <p className="text-[13.5px] text-[color:var(--text-dim)] leading-relaxed pt-1">
+            GAKE watches the sky and bets on it — same forecast data, same
+            on-chain whale signals, no feelings involved.{" "}
+            <Link href="/about" className="text-[color:var(--purple-bright)] font-semibold">
+              how it works →
+            </Link>
+          </p>
+        </div>
 
         <StatsBanner
           stats={[
-            { label: "Signals Live", value: String(signals.length) },
-            { label: "Resolved Events", value: String(totalResolved) },
-            { label: "Win Rate", value: `${winRatePct}%`, accent: "green" },
+            { label: "cities gake is stalking", value: String(signals.length) },
+            { label: "gake's receipts", value: String(totalResolved) },
+            { label: "gake's hit rate", value: `${winRatePct}%`, accent: "green" },
             {
-              label: "Avg ROI / Event",
+              label: "gake's average W",
               value: totalResolved > 0 ? `${Number(avgRoi) >= 0 ? "+" : ""}${avgRoi}%` : "—",
               accent: Number(avgRoi) >= 0 ? "green" : "red",
             },
@@ -157,7 +158,7 @@ export default async function Home() {
 
         {restSignals.length > 0 && (
           <ExpandableSection
-            title="Gap Radar"
+            title="other things gake is watching"
             totalCount={restSignals.length}
           >
             {restSignals.map((s) => (
@@ -168,34 +169,28 @@ export default async function Home() {
 
         {signals.length === 0 && (
           <p className="text-[color:var(--text-dim)] text-sm mb-9">
-            No signals yet. Waiting for next calculation cycle.
+            gake is thinking really hard rn. check back soon.
           </p>
         )}
 
-        <ExpandableSection title="Live Weather Feed — Other Open Markets" totalCount={uncovered.length}>
-          {uncovered.map((m) => (
+        <ExpandableSection title="current conditions" totalCount={currentWeather.length}>
+          {currentWeather.map((c) => (
             <div
-              key={`${m.city_name}|${m.target_date}`}
+              key={c.city_name}
               className="rounded-[18px] border border-[color:var(--border)] bg-[color:var(--panel)] px-5 py-4.5"
             >
-              <div className="text-base font-bold truncate">{m.city_name}</div>
+              <div className="text-base font-bold truncate">{c.city_name}</div>
               <div className="font-mono text-[11px] text-[color:var(--text-faint)] mt-1 mb-3">
-                {m.target_date}
+                observed {new Date(c.observed_at).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </div>
-              {m.predicted_temp !== null ? (
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-lg font-semibold text-[color:var(--foreground)]">
-                    {m.predicted_temp.toFixed(1)}°C
-                  </span>
-                  <span className="text-[10px] font-semibold text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.1)] rounded-full px-2.5 py-1">
-                    NO PACKAGE
-                  </span>
-                </div>
-              ) : (
-                <div className="text-[11px] font-semibold text-[color:var(--text-dim)] bg-[rgba(144,137,184,0.1)] rounded-full px-3 py-1.5 inline-block">
-                  FETCHING...
-                </div>
-              )}
+              <span className="font-mono text-lg font-semibold text-[color:var(--foreground)]">
+                {c.current_temp_c.toFixed(1)}°C
+              </span>
             </div>
           ))}
         </ExpandableSection>

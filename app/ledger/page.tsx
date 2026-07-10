@@ -44,21 +44,21 @@ export default async function LedgerPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-5 sm:px-10 py-8">
-      <h1 className="text-xl font-bold tracking-tight mb-1.5">Historical Performance</h1>
+      <h1 className="text-xl font-bold tracking-tight mb-1.5">gake's receipts</h1>
       <p className="text-sm text-[color:var(--text-dim)] mb-7">
-        Transparent log of settled weather markets GAKE has tracked.
+        every bet gake has ever placed on itself, win or lose — nothing hidden.
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
           <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
-            Resolved Events
+            settled bets
           </div>
           <div className="font-mono text-2xl mt-1.5">{total}</div>
         </div>
         <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
           <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
-            Win Rate
+            gake's hit rate
           </div>
           <div className="font-mono text-2xl mt-1.5 text-[color:var(--green)]">
             {winRatePct}%
@@ -66,7 +66,7 @@ export default async function LedgerPage() {
         </div>
         <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
           <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
-            Avg ROI / Event
+            gake's average W
           </div>
           <div
             className={`font-mono text-2xl mt-1.5 ${
@@ -79,7 +79,7 @@ export default async function LedgerPage() {
         </div>
         <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 text-center">
           <div className="text-[11px] text-[color:var(--text-faint)] font-semibold uppercase">
-            Defended
+            gake dodged it
           </div>
           <div className="font-mono text-2xl mt-1.5 text-[#f2c879]">{defendedCount}</div>
         </div>
@@ -87,7 +87,7 @@ export default async function LedgerPage() {
 
       <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-5 mb-10">
         <div className="text-xs text-[color:var(--text-faint)] font-semibold uppercase tracking-wide mb-3">
-          Cumulative ROI
+          gake's cumulative mood swing
         </div>
         <RoiChart data={chartData} />
       </div>

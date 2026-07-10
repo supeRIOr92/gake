@@ -19,17 +19,17 @@ export default function Header() {
     <header className="border-b border-[color:var(--border)] backdrop-blur-md sticky top-0 z-50 bg-[color:var(--background)]/80">
       <div className="max-w-[1400px] mx-auto px-5 sm:px-10 py-4 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-3 shrink-0" onClick={() => setOpen(false)}>
-          <div className="relative w-[34px] h-[34px] shrink-0 rounded-[40%_40%_50%_50%/45%_45%_55%_55%] bg-gradient-to-br from-[#c9c0ff] to-[#6f5fe0] shadow-[0_0_18px_rgba(171,159,242,0.5)]">
-            <span className="absolute left-[30%] top-[42%] w-1 h-1 rounded-full bg-[#1a1428]" />
-            <span className="absolute right-[30%] top-[42%] w-1 h-1 rounded-full bg-[#1a1428]" />
+          <div className="relative w-[34px] h-[34px] shrink-0 rounded-[40%_40%_50%_50%/45%_45%_55%_55%] bg-gradient-to-br from-[#ffe14d] to-[#ff6fd8] shadow-[0_0_18px_rgba(255,225,77,0.5)]">
+            <span className="absolute left-[30%] top-[42%] w-1 h-1 rounded-full bg-[#1a0f2e]" />
+            <span className="absolute right-[30%] top-[42%] w-1 h-1 rounded-full bg-[#1a0f2e]" />
           </div>
           <div>
             <div className="text-[15px] sm:text-lg font-extrabold tracking-tight">
-              <span className="text-[color:var(--purple)]">GAKE</span>
-              <span className="hidden sm:inline"> // Get Alpha, Knock &apos;Em</span>
+              <span className="text-[color:var(--purple)]">$GAKE</span>
+              <span className="hidden sm:inline"> — the cloud that bets on itself</span>
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-[color:var(--text-faint)] mt-0.5">
-              Weather Arbitrage Signals
+              weather markets, watched closely
             </div>
           </div>
         </Link>
@@ -43,7 +43,7 @@ export default function Header() {
                 href={item.href}
                 className={`text-[13px] font-semibold px-4 py-2 rounded-[9px] transition-colors ${
                   active
-                    ? "text-[#0e0b1a] bg-gradient-to-br from-[#c9c0ff] to-[#ab9ff2]"
+                    ? "text-[#1a0f2e] bg-gradient-to-br from-[#ffe14d] to-[#ffd21a]"
                     : "text-[color:var(--text-dim)] hover:text-[color:var(--foreground)] hover:bg-[color:var(--panel-2)]"
                 }`}
               >
@@ -97,7 +97,7 @@ export default function Header() {
                 onClick={() => setOpen(false)}
                 className={`text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors ${
                   active
-                    ? "text-[#0e0b1a] bg-gradient-to-br from-[#c9c0ff] to-[#ab9ff2]"
+                    ? "text-[#1a0f2e] bg-gradient-to-br from-[#ffe14d] to-[#ffd21a]"
                     : "text-[color:var(--text-dim)] bg-[color:var(--panel)]"
                 }`}
               >

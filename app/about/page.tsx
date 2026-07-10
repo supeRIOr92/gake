@@ -9,25 +9,43 @@ function ExampleBox({ children }: { children: React.ReactNode }) {
 export default function AboutPage() {
   return (
     <div className="max-w-3xl mx-auto px-5 sm:px-10 py-8">
-      <h1 className="text-xl font-bold tracking-tight mb-1.5">What is GAKE?</h1>
+      <div className="flex items-start gap-4 mb-6">
+        <span className="text-5xl leading-none select-none" aria-hidden>
+          ☁️<span className="inline-block -ml-4 -mt-2 align-top text-2xl">🕶️</span>
+        </span>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight mb-1.5">who (or what) is GAKE?</h1>
+          <p className="text-[11px] uppercase tracking-widest text-[color:var(--purple-bright)] font-bold">
+            the cloud that bets on itself
+          </p>
+        </div>
+      </div>
+
       <p className="text-sm text-[color:var(--text-dim)] mb-9 leading-relaxed">
-        GAKE (Get Alpha, Knock &apos;Em) scans every open weather market on Polymarket,
-        compares it against live weather forecasts and detected smart-money activity,
-        and surfaces two types of trade ideas below. GAKE never executes trades for you —
-        you always copy the Contract ID and place orders manually on Polymarket.
+        GAKE (Get Alpha, Knock &apos;Em) watches the sky and bets on it — same
+        forecast data, same on-chain whale signals, no feelings involved. We
+        don&apos;t know if that&apos;s smart or unhinged. Probably both. GAKE
+        scans every open weather market on Polymarket, compares it against
+        live weather forecasts and detected smart-money activity, and
+        surfaces two types of trade ideas below. GAKE never executes trades
+        for you — you always copy the Contract ID and place orders manually
+        on Polymarket.
       </p>
 
       <section className="mb-10">
         <h2 className="text-sm uppercase tracking-widest text-[color:var(--purple-bright)] mb-3 border-b border-[color:var(--border)] pb-2.5">
-          Hedging Package (Gap Radar)
+          the safety blanket
         </h2>
         <div className="space-y-3 text-sm text-[color:var(--text-dim)] leading-relaxed">
           <p>
             Each weather market on Polymarket resolves based on the actual highest
             temperature recorded on a given day, split into narrow buckets (e.g. &quot;94-95°F&quot;,
-            &quot;96-97°F&quot;). GAKE picks a likely bucket and builds a package around it. When a
-            package is ready, a <span className="text-[color:var(--purple-bright)]">HEDGED</span> badge
-            appears, showing the package&apos;s Best Case and Worst Case ROI.
+            &quot;96-97°F&quot;). GAKE picks a likely bucket and builds a package around it. When
+            a package is ready, a{" "}
+            <span className="text-[color:var(--purple-bright)]">the safety blanket</span> badge
+            appears, showing the package&apos;s Best Case and Worst Case ROI, plus{" "}
+            <span className="text-[color:var(--purple-bright)]">gake&apos;s gut feeling</span> —
+            how sure GAKE actually is, not just how big the upside looks.
           </p>
           <p>
             Instead of betting everything on one exact temperature, GAKE builds a small
@@ -37,7 +55,7 @@ export default function AboutPage() {
             on the most likely bucket. This mirrors the coverage style used by consistently
             profitable wallets we track on-chain: instead of a single directional bet, you
             hold a spread of outcomes so a small miss on the exact temperature doesn&apos;t wipe
-            out the whole position.
+            out the whole position — a literal safety blanket for when the forecast is wrong.
           </p>
 
           <ExampleBox>
@@ -76,20 +94,21 @@ export default function AboutPage() {
 
           <p>
             <span className="text-[color:var(--foreground)] font-semibold">How to use it:</span> click a card
-            in the Gap Radar to open its details, review the suggested allocation percentages, then
+            in <span className="text-[color:var(--purple-bright)] font-semibold">other things gake is watching</span> to
+            open its details, review the suggested allocation percentages, then
             copy each Contract ID and place the trades yourself on Polymarket. You decide
-            your own budget and execution — GAKE only tells you the split.
+            your own budget and execution — $GAKE only tells you the split.
           </p>
         </div>
       </section>
 
       <section className="mb-10">
         <h2 className="text-sm uppercase tracking-widest text-[color:var(--purple-bright)] mb-3 border-b border-[color:var(--border)] pb-2.5">
-          Scalp Signal
+          watching whales
         </h2>
         <div className="space-y-3 text-sm text-[color:var(--text-dim)] leading-relaxed">
           <p>
-            This is a completely different game from Hedging Package. Scalp Signal has
+            This is a completely different game from the safety blanket. Watching whales has
             nothing to do with predicting the weather — it&apos;s about catching mispricing in
             markets that just opened. When a weather market is fresh (usually under 24
             hours old), it hasn&apos;t been &quot;priced in&quot; properly yet, and odds can be off from
@@ -108,7 +127,7 @@ export default function AboutPage() {
             </p>
             <ul className="space-y-1.5">
               <li>
-                <span className="text-[color:var(--purple-bright)] font-semibold">1. New Entry Radar</span>{" "}
+                <span className="text-[color:var(--purple-bright)] font-semibold">1. fresh whale sightings</span>{" "}
                 — Whale-37 detected buying <span className="text-[color:var(--red)] font-bold">NO</span> at
                 0.82, 6 minutes ago, on a market opened 2 hours ago. You buy NO manually
                 on Polymarket around the same price.
@@ -119,7 +138,7 @@ export default function AboutPage() {
                 exit this type of position).
               </li>
               <li>
-                <span className="text-[color:var(--purple-bright)] font-semibold">3. Exit Progress</span> —
+                <span className="text-[color:var(--purple-bright)] font-semibold">3. watch and pounce</span> —
                 the market moves into the 24-48h bucket. Move on your position climbs to
                 +38%, past the +30% mark on the progress bar. That&apos;s your cue: sell manually
                 on Polymarket and lock in the gain — don&apos;t wait for the weather to actually
@@ -130,10 +149,10 @@ export default function AboutPage() {
 
           <p>
             <span className="text-[color:var(--foreground)] font-semibold">How to use it:</span> watch{" "}
-            <span className="text-[color:var(--purple-bright)] font-semibold">New Entry Radar</span> for a
+            <span className="text-[color:var(--purple-bright)] font-semibold">fresh whale sightings</span> for a
             market where a whale just entered — the newer, the closer you can match their entry
             price. Enter the same side manually on Polymarket. Once that market moves into{" "}
-            <span className="text-[color:var(--purple-bright)] font-semibold">Exit Progress</span>, watch
+            <span className="text-[color:var(--purple-bright)] font-semibold">watch and pounce</span>, watch
             the Move percentage against the +30-50% historical target — the closer or past it,
             the more urgent it is to check and exit manually. You are not holding until
             settlement; you&apos;re trading the price correction itself.
@@ -143,13 +162,13 @@ export default function AboutPage() {
 
       <section>
         <h2 className="text-sm uppercase tracking-widest text-[color:var(--purple-bright)] mb-3 border-b border-[color:var(--border)] pb-2.5">
-          Ledger
+          gake's receipts
         </h2>
         <p className="text-sm text-[color:var(--text-dim)] leading-relaxed">
-          Every Hedging Package signal GAKE has ever surfaced is logged here once all of its
+          Every safety-blanket package GAKE has ever surfaced is logged here once all of its
           underlying markets settle, with the real net ROI calculated from actual resolution
           prices — nothing curated or cherry-picked. This is the full track record, good and
-          bad trades alike.
+          bad bets alike.
         </p>
       </section>
     </div>

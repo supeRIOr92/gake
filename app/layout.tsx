@@ -15,9 +15,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GAKE // Get Alpha, Knock 'Em",
+  title: "$GAKE — the cloud that bets on itself",
   description:
-    "Weather markets signal terminal for Polymarket. Gap detection, sharp money tracking, and hedged strategy packages.",
+    "GAKE watches the weather and bets on it — same forecast data, same on-chain whale signals, no feelings involved.",
 };
 
 export default function RootLayout({

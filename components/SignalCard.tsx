@@ -17,8 +17,41 @@ export interface Signal {
   market_id: string;
   net_gap: number;
   signal_status: string;
-  strategy_package: { positions: Position[] };
+  strategy_package: {
+    positions: Position[];
+    confidence?: number;
+    package_win_probability?: number;
+    sigma_validated?: boolean;
+  };
   created_at: string;
+}
+
+// Package Win Probability is capped at 85% when displayed — even in the
+// sigma-validated cities, out-of-sample testing only checked the extremes,
+// so showing a number that implies near-certainty (95%+) would overstate
+// what's actually been verified. This cap is a display-only safety margin,
+// it does not change the underlying calculation or the strategy_package data
+// stored in Supabase.
+const DISPLAY_CAP = 0.85;
+
+export function packageConfidenceLabel(
+  pkg: Signal["strategy_package"]
+): { text: string; className: string } | null {
+  const prob = pkg.package_win_probability;
+  if (prob === undefined) return null;
+
+  const displayProb = Math.min(prob, DISPLAY_CAP);
+  const pct = Math.round(displayProb * 100);
+
+  let className: string;
+  if (prob >= 0.6) className = "text-[color:var(--green)] bg-[rgba(110,255,160,0.12)]";
+  else if (prob >= 0.3) className = "text-[#f2c879] bg-[rgba(242,200,121,0.12)]";
+  else className = "text-[color:var(--text-dim)] bg-[rgba(179,157,219,0.1)]";
+
+  return {
+    text: `gake's gut feeling: ${pct}%`,
+    className,
+  };
 }
 
 interface Market {
@@ -29,7 +62,7 @@ interface Market {
 }
 
 const PILL_CLASS =
-  "text-[color:var(--purple-bright)] bg-[rgba(171,159,242,0.14)]";
+  "text-[color:var(--purple-bright)] bg-[rgba(255,225,77,0.14)]";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -57,12 +90,13 @@ export default function SignalCard({
 }) {
   const [open, setOpen] = useState(false);
   const { bestRoi, worstRoi } = computeRoiRange(signal.strategy_package.positions);
+  const conf = packageConfidenceLabel(signal.strategy_package);
 
   return (
     <>
       <div
         onClick={() => setOpen(true)}
-        className="cursor-pointer rounded-[20px] border border-[color:var(--border)] bg-gradient-to-b from-[color:var(--panel-2)] to-[color:var(--panel)] p-5 flex flex-col hover:border-[rgba(171,159,242,0.4)] hover:-translate-y-0.5 transition-all"
+        className="cursor-pointer rounded-[20px] border border-[color:var(--border)] bg-gradient-to-b from-[color:var(--panel-2)] to-[color:var(--panel)] p-5 flex flex-col hover:border-[rgba(255,225,77,0.4)] hover:-translate-y-0.5 transition-all"
       >
         <div className="flex justify-between items-start mb-1">
           <div>
@@ -71,11 +105,20 @@ export default function SignalCard({
               {market.target_date}
             </div>
           </div>
-          <span
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${PILL_CLASS}`}
-          >
-            HEDGED
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${PILL_CLASS}`}
+            >
+              the safety blanket
+            </span>
+            {conf && (
+              <span
+                className={`text-[9.5px] font-bold uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${conf.className}`}
+              >
+                {conf.text}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="my-4 p-4 rounded-2xl bg-black/20 flex gap-4">
@@ -139,6 +182,12 @@ export default function SignalCard({
             ✕
           </button>
         </div>
+
+        {conf && (
+          <div className={`text-[11px] font-bold uppercase rounded-xl px-3.5 py-2.5 mb-4 ${conf.className}`}>
+            {conf.text}
+          </div>
+        )}
 
         <div className="my-4.5 p-4 rounded-2xl bg-black/20 flex gap-4">
           <div className="flex-1">

@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0e0b1a;
-  --panel: #191428;
-  --panel-2: #201a34;
-  --border: rgba(171, 159, 242, 0.16);
-  --purple: #ab9ff2;
-  --purple-deep: #6f5fe0;
-  --purple-bright: #c9c0ff;
-  --foreground: #f1eefc;
-  --text-dim: #9089b8;
-  --text-faint: #5f5980;
-  --green: #7ee8b8;
-  --red: #f2879f;
+  /* GAKE palette — storm purple / lightning yellow / high contrast */
+  --background: #1a0f2e;
+  --panel: #241537;
+  --panel-2: #2e1c47;
+  --border: rgba(255, 225, 77, 0.18);
+  --purple: #ffe14d;
+  --purple-deep: #ff6fd8;
+  --purple-bright: #ffe873;
+  --foreground: #f4eefc;
+  --text-dim: #b39ddb;
+  --text-faint: #7a5fa8;
+  --green: #6effa0;
+  --red: #ff7373;
 }
 
 @theme inline {
@@ -44,7 +45,7 @@ body::after {
 body::before {
   width: 480px;
   height: 480px;
-  background: var(--purple-deep);
+  background: #ff6fd8;
   top: -180px;
   left: -100px;
 }
@@ -52,10 +53,10 @@ body::before {
 body::after {
   width: 420px;
   height: 420px;
-  background: #4a3fb0;
+  background: #ffe14d;
   bottom: -150px;
   right: -80px;
-  opacity: 0.25;
+  opacity: 0.2;
 }
 
 header,

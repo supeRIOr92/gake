@@ -42,12 +42,6 @@ function toCelsius(value: number, unit: 'F' | 'C'): number {
   return unit === 'F' ? ((value - 32) * 5) / 9 : value;
 }
 
-function distanceToRange(temp: number, minC: number, maxC: number): number {
-  if (temp >= minC && temp <= maxC) return 0;
-  if (temp < minC) return minC - temp;
-  return temp - maxC;
-}
-
 // Abramowitz-Stegun approximation of the error function (erf), used to compute
 // the Gaussian CDF below. Max error ~1.5e-7, more than precise enough here.
 function erf(x: number): number {
@@ -78,10 +72,7 @@ function bucketProbability(lo: number, hi: number, mu: number, sigma: number): n
 // probability bins of 90-100% matched an actual 81.8% win rate, and 20-30%
 // bins matched an actual 24.2% win rate (n=11 and n=66 respectively) — the
 // mid-probability range (30-70%) had too few samples to validate reliably.
-// This replaces the old per-event-normalized composite score (which was
-// found to be structurally uninformative: the argmax bucket always scored
-// near 1.0 regardless of true confidence, since scores were normalized
-// against the max within the same event). See memory/2026-07-08.md.
+// See memory/2026-07-08.md.
 const FORECAST_ERROR_SIGMA_C = 1.95;
 
 // Small secondary adjustment: buckets whales have NOT bet NO on get a mild
@@ -94,13 +85,91 @@ const WHALE_NO_AVOIDANCE_NUDGE = 0.05;
 // events for cities where a consistent, non-random directional bias was
 // found (LA consistently over-forecasts hot by +3.59C; Chicago consistently
 // under-forecasts by -1.51C). Cities not listed here had no significant bias
-// detected and are left uncorrected (0). This is deliberately NOT applied to
-// cities without historical settlement data to verify against — see
-// memory/2026-07-08.md.
+// detected and are left uncorrected (0).
 const CITY_BIAS_CORRECTION_C: Record<string, number> = {
   'los angeles': 3.59,
   'chicago': -1.51,
 };
+
+// Cities where FORECAST_ERROR_SIGMA_C was actually fitted & validated against
+// real settlement history (259 events, see comment above). All other cities
+// (41+ added later via city_station_map ICAO verification) use the SAME sigma
+// value as a working assumption, but that assumption has NOT been checked
+// against their own settlement history yet — different climates (tropical,
+// coastal, desert) could plausibly have different forecast-error spread.
+// This flag is surfaced to the frontend so package_win_probability is never
+// shown as equally "proven" for a city with zero backtest history behind it.
+const SIGMA_VALIDATED_CITIES = new Set([
+  'austin', 'chicago', 'denver', 'houston', 'los angeles', 'miami',
+  'new york city', 'nyc', 'seattle', 'shanghai',
+]);
+
+interface Position {
+  side: 'YES' | 'NO';
+  entry_price: number;
+  allocation_pct: number;
+}
+
+// Computes payout of a single position if it wins: allocation / entry_price
+// (same formula used by lib/roi.ts on the frontend, kept consistent).
+function payout(p: Position): number {
+  return p.allocation_pct / p.entry_price;
+}
+
+// Package Win Probability: sums the Gaussian probability of every scenario
+// (which bucket actually happens) that results in a NET PROFIT for the whole
+// package — not just "did the YES bucket hit". This directly answers "if YES
+// misses but every NO position was right, do we still come out ahead?" since
+// that is exactly one of the scenarios summed here (see memory/2026-07-08.md
+// package-level defensibility discussion).
+//
+// For each candidate bucket in the event (YES bucket, each covered NO bucket,
+// and every uncovered "neither" bucket), we compute what the package payout
+// would be IF the actual temperature landed in that bucket, compare to the
+// 100% budget baseline, and if it's a net win we add that bucket's Gaussian
+// probability to the total.
+function computePackageWinProbability(
+  allBucketsWithProb: { id: string; prob: number }[],
+  yesId: string,
+  noIds: string[],
+  yesEntry: number,
+  noEntries: Map<string, number>,
+  yesAllocPct: number,
+  noAllocPctEach: number
+): number {
+  const totalAlloc = yesAllocPct + noAllocPctEach * noIds.length;
+  let winProb = 0;
+
+  for (const bucket of allBucketsWithProb) {
+    let packagePayout = 0;
+    if (bucket.id === yesId) {
+      // YES bucket hits: YES wins, every NO position also wins (the actual
+      // bucket isn't any of them).
+      packagePayout += yesAllocPct / yesEntry;
+      for (const noId of noIds) {
+        packagePayout += noAllocPctEach / (noEntries.get(noId) || 1);
+      }
+    } else if (noIds.includes(bucket.id)) {
+      // This particular NO bucket hits: YES loses, THIS NO loses, the other
+      // NO positions still win.
+      for (const noId of noIds) {
+        if (noId === bucket.id) continue;
+        packagePayout += noAllocPctEach / (noEntries.get(noId) || 1);
+      }
+    } else {
+      // Neither YES nor any covered NO bucket hits: YES loses, but ALL NO
+      // positions win (this is the scenario the user asked about directly).
+      for (const noId of noIds) {
+        packagePayout += noAllocPctEach / (noEntries.get(noId) || 1);
+      }
+    }
+    if (packagePayout > totalAlloc) {
+      winProb += bucket.prob;
+    }
+  }
+
+  return Math.max(0, Math.min(1, winProb));
+}
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
@@ -203,7 +272,7 @@ export async function GET(req: Request) {
 
     // --- Bucket-selection: Gaussian probability model ---
     // Each bucket's true probability = area under a Normal(predictedTemp, sigma)
-    // curve within that bucket's temp range. Unlike the old per-event-normalized
+    // curve within that bucket's temp range. Unlike a per-event-normalized
     // score, this is comparable ACROSS events (a 0.8 here means the same thing
     // as a 0.8 on a different event/city), because it isn't rescaled relative
     // to sibling buckets.
@@ -216,6 +285,7 @@ export async function GET(req: Request) {
       )
     );
     const totalProb = rawProbs.reduce((a, b) => a + b, 0) || 1;
+    const normalizedProbs = rawProbs.map((p) => p / totalProb);
     const noCosts = parsedMarkets.map((m) => whaleNoCostByMarket.get(m.id) || 0);
     const maxNoCost = Math.max(...noCosts);
 
@@ -223,7 +293,7 @@ export async function GET(req: Request) {
     let bestScore = -Infinity;
     let targetConfidence = 0;
     parsedMarkets.forEach((m, i) => {
-      const probability = rawProbs[i] / totalProb;
+      const probability = normalizedProbs[i];
       const whaleNoScore = maxNoCost > 0 ? 1 - noCosts[i] / maxNoCost : 0.5;
       const combined = probability + WHALE_NO_AVOIDANCE_NUDGE * whaleNoScore;
       if (combined > bestScore) {
@@ -254,8 +324,31 @@ export async function GET(req: Request) {
     const NO_BUDGET_PCT = 70;
     const noSharePct = Math.round(NO_BUDGET_PCT / noCandidates.length);
 
+    // --- Package Win Probability (new) ---
+    // Unlike targetConfidence (which only reflects "does the YES bucket hit"),
+    // this sums the Gaussian probability of EVERY scenario that leaves the
+    // whole package net-positive, including the scenario where YES misses but
+    // all 3 NO positions win (see memory/2026-07-08.md — user-requested check
+    // on whether "YES loses, all NO correct" is automatically profitable; it
+    // is NOT automatic, it depends on NO entry prices, hence this computation).
+    const allBucketsWithProb = parsedMarkets.map((m, i) => ({ id: m.id, prob: normalizedProbs[i] }));
+    const noEntries = new Map(noCandidates.map((m) => [m.id, m.current_no_price]));
+    const packageWinProbability = computePackageWinProbability(
+      allBucketsWithProb,
+      targetBucket.id,
+      noCandidates.map((m) => m.id),
+      targetBucket.current_yes_price,
+      noEntries,
+      YES_CAP_PCT,
+      noSharePct
+    );
+
+    const sigmaValidated = SIGMA_VALIDATED_CITIES.has(cityBase);
+
     const strategyPackage = {
       confidence: Number(targetConfidence.toFixed(3)),
+      package_win_probability: Number(packageWinProbability.toFixed(3)),
+      sigma_validated: sigmaValidated,
       positions: [
         {
           side: 'YES',

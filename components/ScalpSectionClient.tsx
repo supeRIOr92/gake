@@ -53,7 +53,7 @@ export default function ScalpSectionClient({
               onClick={() => setFilterIdx(i)}
               className={`text-[12px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
                 filterIdx === i
-                  ? "text-[#0e0b1a] bg-gradient-to-br from-[#c9c0ff] to-[#ab9ff2] border-transparent"
+                  ? "text-[#1a0f2e] bg-gradient-to-br from-[#ffe14d] to-[#ffd21a] border-transparent"
                   : "text-[color:var(--text-dim)] bg-[color:var(--panel)] border-[color:var(--border)] hover:text-[color:var(--foreground)]"
               }`}
             >

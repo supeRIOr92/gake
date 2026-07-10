@@ -7,7 +7,7 @@ export default function RoiChart({ data }: { data: DataPoint[] }) {
   if (data.length === 0) {
     return (
       <div className="h-40 flex items-center justify-center text-[color:var(--text-faint)] text-sm">
-        No resolved events yet.
+        gake hasn't placed a bet yet.
       </div>
     );
   }
@@ -41,14 +41,14 @@ export default function RoiChart({ data }: { data: DataPoint[] }) {
           y1={zeroY}
           x2={width}
           y2={zeroY}
-          stroke="#3a3452"
+          stroke="#4a3a6a"
           strokeWidth="0.5"
           strokeDasharray="2,2"
         />
         <polyline
           points={points.join(" ")}
           fill="none"
-          stroke={isPositive ? "#7ee8b8" : "#f2879f"}
+          stroke={isPositive ? "#6effa0" : "#ff7373"}
           strokeWidth="1.5"
           vectorEffect="non-scaling-stroke"
         />

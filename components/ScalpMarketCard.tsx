@@ -52,7 +52,7 @@ function EntryRow({ entry }: { entry: ScalpEntry }) {
         </span>
         <div className="flex items-center gap-1.5">
           {isPrime && (
-            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full text-[#0e0b1a] bg-gradient-to-br from-[#c9c0ff] to-[color:var(--green)]">
+            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full text-[#1a0f2e] bg-gradient-to-br from-[#ffe14d] to-[color:var(--green)]">
               PRIME
             </span>
           )}
@@ -104,7 +104,7 @@ export default function ScalpMarketCard({
     <>
       <div
         onClick={() => setOpen(true)}
-        className="cursor-pointer rounded-[20px] border border-[color:var(--border)] bg-gradient-to-b from-[color:var(--panel-2)] to-[color:var(--panel)] p-5 flex flex-col hover:border-[rgba(171,159,242,0.4)] hover:-translate-y-0.5 transition-all"
+        className="cursor-pointer rounded-[20px] border border-[color:var(--border)] bg-gradient-to-b from-[color:var(--panel-2)] to-[color:var(--panel)] p-5 flex flex-col hover:border-[rgba(255,225,77,0.4)] hover:-translate-y-0.5 transition-all"
       >
         <div className="flex items-start justify-between mb-1">
           <div>
@@ -115,12 +115,12 @@ export default function ScalpMarketCard({
           </div>
           <div className="flex items-center gap-1.5">
             {hasPrimeEntry && (
-              <span className="text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap text-[#0e0b1a] bg-gradient-to-br from-[#c9c0ff] to-[color:var(--green)]">
+              <span className="text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap text-[#1a0f2e] bg-gradient-to-br from-[#ffe14d] to-[color:var(--green)]">
                 PRIME
               </span>
             )}
             {entryCount > 1 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap text-[color:var(--purple-bright)] bg-[rgba(171,159,242,0.12)]">
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap text-[color:var(--purple-bright)] bg-[rgba(255,225,77,0.12)]">
                 {entryCount} entries
               </span>
             )}
@@ -137,7 +137,7 @@ export default function ScalpMarketCard({
             </div>
             {hasPrimeEntry && (
               <div className="text-[11px] font-semibold text-[color:var(--green)] mt-2">
-                Prime entry window — historically the most profitable scalps started this early
+                gake's favorite window — historically the most profitable scalps started this early
               </div>
             )}
           </div>
@@ -159,7 +159,7 @@ export default function ScalpMarketCard({
             </div>
             <div className="h-1.5 rounded-full bg-black/30 overflow-hidden mb-2">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#c9c0ff] to-[color:var(--green)]"
+                className="h-full rounded-full bg-gradient-to-r from-[#ffe14d] to-[color:var(--green)]"
                 style={{ width: `${targetProgress}%` }}
               />
             </div>

@@ -67,6 +67,23 @@ async function fetchOpenMeteoTemp(
   return { temp: mean, stdDev: Math.sqrt(variance) };
 }
 
+// Real-time observed temperature (NOT a forecast) — used for the "Current
+// Conditions" section, which is intentionally decoupled from Polymarket
+// market status (unlike predicted_temp, which only exists for city/date
+// combos that have an active market). Fetched once per unique city, since
+// current conditions don't depend on target_date.
+async function fetchCurrentTemp(lat: number, lon: number): Promise<number | null> {
+  const res = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m&timezone=auto`
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  const temp = data.current?.temperature_2m;
+  const time = data.current?.time;
+  if (temp === undefined || temp === null || !time) return null;
+  return temp;
+}
+
 async function processOne(
   city_name: string,
   target_date: string,
@@ -120,6 +137,34 @@ async function processOne(
       confidence_score: confidenceScore,
       data_source: dataSource,
       confidence_source: confidenceSource,
+      updated_at: new Date().toISOString(),
+    },
+  };
+}
+
+async function processCurrentTemp(
+  city_name: string,
+  geocodeCache: Map<string, Awaited<ReturnType<typeof geocodeCity>>>
+): Promise<{ row?: Record<string, unknown>; error?: string }> {
+  let geo = geocodeCache.get(city_name);
+  if (geo === undefined) {
+    geo = await geocodeCity(city_name);
+    geocodeCache.set(city_name, geo);
+  }
+  if (!geo) {
+    return { error: `Geocode failed (current temp): ${city_name}` };
+  }
+
+  const temp = await fetchCurrentTemp(geo.lat, geo.lon);
+  if (temp === null) {
+    return { error: `Current temp fetch failed: ${city_name}` };
+  }
+
+  return {
+    row: {
+      city_name,
+      current_temp_c: temp,
+      observed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   };
@@ -181,5 +226,34 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ upserted, errors, totalUniqueCityDates: uniqueKeys.size });
+  // Current (observed, real-time) temperature — one row per unique city,
+  // independent of target_date/market status. Powers the homepage's "Current
+  // Conditions" section, which intentionally does not reference Polymarket
+  // markets at all (unlike the old "Live Weather Feed" it replaces).
+  const uniqueCities = Array.from(new Set(keys.map((k) => k.city_name)));
+  const currentRows: Record<string, unknown>[] = [];
+  for (let i = 0; i < uniqueCities.length; i += BATCH_SIZE) {
+    const batch = uniqueCities.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map((city_name) => processCurrentTemp(city_name, geocodeCache))
+    );
+    for (const r of results) {
+      if (r.error) errors.push(r.error);
+      if (r.row) currentRows.push(r.row);
+    }
+  }
+
+  let currentUpserted = 0;
+  if (currentRows.length > 0) {
+    const { error } = await supabaseAdmin
+      .from('city_current_weather')
+      .upsert(currentRows, { onConflict: 'city_name' });
+    if (error) {
+      errors.push(error.message);
+    } else {
+      currentUpserted = currentRows.length;
+    }
+  }
+
+  return NextResponse.json({ upserted, currentUpserted, errors, totalUniqueCityDates: uniqueKeys.size });
 }

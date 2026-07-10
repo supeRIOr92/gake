@@ -34,7 +34,7 @@ export default function SharpMoneySidebar({ activity }: { activity: ActivityRow[
       <div className="flex flex-col font-mono text-[11px] max-h-[520px] overflow-y-auto">
         {activity.length === 0 && (
           <p className="text-[color:var(--text-faint)] text-xs font-sans py-3">
-            No large trades detected yet.
+            gake is sulking, no big money moving yet.
           </p>
         )}
         {activity.map((a) => (

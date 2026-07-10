@@ -118,38 +118,39 @@ export default async function ScalpPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-5 sm:px-10 py-8">
-      <h1 className="text-xl font-bold tracking-tight mb-1.5">Live Entry Alerts</h1>
+      <h1 className="text-xl font-bold tracking-tight mb-1.5">gake is watching whales</h1>
       <p className="text-sm text-[color:var(--text-dim)] mb-7 leading-relaxed">
-        Whale entries detected on fresh, potentially mispriced markets. Not directional
-        weather bets — pure timing arbitrage. Exit manually once price re-corrects.
-        Median hold time historically ~13 hours.
+        big money moving on markets so fresh they haven&apos;t settled into a fair
+        price yet. this has nothing to do with the weather itself — gake is
+        just watching who moves first. exit manually once price re-corrects.
+        median hold time historically ~13 hours.
       </p>
 
       <ScalpSectionClient
-        title="New Entry Radar"
-        subtitle="< 24h old — whale just entered, ranked by most recent. Entries under 8h are marked Prime Entry Window — historically where the most profitable scalps started."
+        title="fresh whale sightings"
+        subtitle="< 24h old — whale just entered, ranked by most recent. entries under 8h are gake's favorite — historically where the most profitable scalps started."
         markets={fresh}
         mode="fresh"
-        emptyText="No fresh whale entries detected right now."
+        emptyText="gake is sulking, no fresh whale entries right now."
       />
 
       <ScalpSectionClient
-        title="Exit Progress"
+        title="watch and pounce"
         subtitle="24-48h old — ranked by how close price has moved toward the historical +30-50% exit target"
         markets={aging}
         mode="aging"
-        emptyText="No aging entries."
+        emptyText="gake is sulking, nothing aging right now."
       />
 
       <div className="rounded-[20px] border border-[color:var(--border)] bg-[color:var(--panel)] p-6 mt-8 text-center">
         <p className="text-sm text-[color:var(--text-dim)] mb-3">
-          Get pinged the moment a fresh mispricing or exit window appears.
+          get pinged the moment gake spots a whale moving.
         </p>
         <a
           href="https://t.me/"
-          className="inline-block text-xs font-mono font-semibold px-4 py-2 rounded-full bg-gradient-to-br from-[#c9c0ff] to-[#ab9ff2] text-[#0e0b1a] hover:opacity-90 transition-opacity"
+          className="inline-block text-xs font-mono font-semibold px-4 py-2 rounded-full bg-gradient-to-br from-[#ffe14d] to-[#ffd21a] text-[#1a0f2e] hover:opacity-90 transition-opacity"
         >
-          Connect Telegram Alerts
+          get gake in your DMs
         </a>
       </div>
     </div>

@@ -137,7 +137,7 @@ export default function LedgerTable({ resolved }: { resolved: ResolvedSignal[] }
             {pageItems.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-[color:var(--text-faint)]">
-                  No resolved events match this filter.
+                  gake is sulking, no receipts match this filter.
                 </td>
               </tr>
             )}
