@@ -43,6 +43,7 @@ async function fetchAllActiveMarkets(): Promise<MarketRow[]> {
       .select("*")
       .eq("status", "active")
       .not("opened_at", "is", null)
+      .order("id")
       .range(offset, offset + pageSize - 1);
     const page = (data || []) as MarketRow[];
     all.push(...page);
