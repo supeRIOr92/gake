@@ -27,11 +27,21 @@ function parseCityAndDate(eventTitle: string): { city: string; date: string } | 
 // limit_per_type and requires paginating via `page` to get the rest — without
 // this, many cities (whichever page they happen to land on) never get fetched
 // at all, silently starving calculate-signals of active markets for them.
-async function fetchAllEvents(): Promise<PolymarketEvent[]> {
+//
+// IMPORTANT: Polymarket's events_status=active filter stops returning an
+// event entirely once it settles — it does NOT come back with closed:true,
+// it just disappears from this query. That meant markets never transitioned
+// to status='settled' in our DB once their event resolved; they stayed
+// 'active' forever, and calculate-signals kept reprocessing them indefinitely
+// (confirmed: Beijing 2026-07-12 market generated 1900+ duplicate signal rows
+// over 5 days after its event resolved). Also querying events_status=resolved
+// (same pagination) fixes this: those events DO come back from that endpoint
+// with closed:true, letting us upsert their true 'settled' status.
+async function fetchAllEvents(status: 'active' | 'resolved'): Promise<PolymarketEvent[]> {
   const events: PolymarketEvent[] = [];
   for (let page = 1; page <= 10; page++) {
     const res = await fetch(
-      `${SEARCH_API}?q=highest%20temperature&events_status=active&limit_per_type=100&page=${page}`
+      `${SEARCH_API}?q=highest%20temperature&events_status=${status}&limit_per_type=100&page=${page}`
     );
     if (!res.ok) break;
     const data = await res.json();
@@ -49,7 +59,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const events = await fetchAllEvents();
+  const [activeEvents, resolvedEvents] = await Promise.all([
+    fetchAllEvents('active'),
+    fetchAllEvents('resolved'),
+  ]);
+  // Resolved events are merged in AFTER active ones so that if the same
+  // market somehow appears in both (shouldn't normally happen, but the API
+  // is a live/shifting dataset), the resolved/closed status wins — a market
+  // that Polymarket says is resolved should never be left marked active.
+  const events = [...activeEvents, ...resolvedEvents];
 
   const errors: string[] = [];
   // Keyed by polymarket_id to dedupe: the paginated search API can return the
@@ -113,5 +131,11 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ upserted, errors, totalEvents: events.length });
+  return NextResponse.json({
+    upserted,
+    errors,
+    totalEvents: events.length,
+    activeEventCount: activeEvents.length,
+    resolvedEventCount: resolvedEvents.length,
+  });
 }
