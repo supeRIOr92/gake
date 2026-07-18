@@ -171,6 +171,30 @@ function computePackageWinProbability(
   return Math.max(0, Math.min(1, winProb));
 }
 
+// Supabase/PostgREST caps every response at 1000 rows regardless of how many
+// rows match the filter. With 3000+ active markets, a single unpaginated
+// query silently returned only the first 1000 (by default physical/insertion
+// order) — meaning ~2/3 of active markets, INCLUDING stale ones that should
+// have been caught by the "already decided" guard below, were never even
+// loaded into memory on most runs. This pages through in batches of 1000
+// until a page comes back short, guaranteeing the full active set is loaded.
+async function fetchAllActiveMarkets(): Promise<Market[]> {
+  const pageSize = 1000;
+  const all: Market[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from('markets')
+      .select('*')
+      .eq('status', 'active')
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const page = (data || []) as Market[];
+    all.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return all;
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -187,11 +211,12 @@ export async function GET(req: Request) {
     (verifiedCities || []).map((c: { city_name: string }) => c.city_name.split(',')[0].trim().toLowerCase())
   );
 
-  const { data: markets, error: mErr } = await supabaseAdmin
-    .from('markets')
-    .select('*')
-    .eq('status', 'active');
-  if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
+  let markets: Market[];
+  try {
+    markets = await fetchAllActiveMarkets();
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
 
   // Pull recent whale activity for the NO-avoidance signal: for each market, how
   // much $ has whale-tier money (>=$500, tracked by fetch-wallet-activity) bet on
@@ -223,7 +248,7 @@ export async function GET(req: Request) {
   }
 
   const events = new Map<string, Market[]>();
-  for (const m of (markets || []) as Market[]) {
+  for (const m of markets) {
     const key = `${m.city_name}|${m.target_date}`;
     if (!events.has(key)) events.set(key, []);
     events.get(key)!.push(m);
@@ -398,5 +423,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ inserted, errors, totalEvents: events.size });
+  return NextResponse.json({ inserted, errors, totalEvents: events.size, totalMarketsLoaded: markets.length });
 }
