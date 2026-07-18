@@ -28,22 +28,41 @@ interface ActivityRow {
   tx_time: string;
 }
 
+// Supabase/PostgREST caps every response at 1000 rows regardless of how many
+// rows match the filter (same root cause fixed in calculate-signals). With
+// 2800+ active markets, a single unpaginated query silently returned only
+// the first 1000 — meaning any eligible scalp market landing past that
+// cutoff never showed up on this page. This pages through in batches of
+// 1000 until a page comes back short, guaranteeing the full active set.
+async function fetchAllActiveMarkets(): Promise<MarketRow[]> {
+  const pageSize = 1000;
+  const all: MarketRow[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data } = await supabase
+      .from("markets")
+      .select("*")
+      .eq("status", "active")
+      .not("opened_at", "is", null)
+      .range(offset, offset + pageSize - 1);
+    const page = (data || []) as MarketRow[];
+    all.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return all;
+}
+
 async function getScalpMarkets() {
-  const { data: marketsRaw } = await supabase
-    .from("markets")
-    .select("*")
-    .eq("status", "active")
-    .not("opened_at", "is", null);
+  const marketsRaw = await fetchAllActiveMarkets();
 
   const now = Date.now();
   // Skip markets already at an extreme price (>=0.98 or <=0.02) — no real mispricing
   // left to scalp at that point, only fees. Matches the same guard used for the
   // Hedging Package signal.
-  const markets = (marketsRaw || []).filter((m: MarketRow) => {
+  const markets = marketsRaw.filter((m: MarketRow) => {
     const hoursOld = (now - new Date(m.opened_at!).getTime()) / 3_600_000;
     const isDecided = m.current_yes_price >= 0.98 || m.current_yes_price <= 0.02;
     return hoursOld < AGING_HOURS && !isDecided;
-  }) as MarketRow[];
+  });
 
   const marketIds = markets.map((m) => m.id);
   if (marketIds.length === 0) return { fresh: [] as ScalpMarket[], aging: [] as ScalpMarket[] };
@@ -93,8 +112,7 @@ async function getScalpMarkets() {
       targetDate: m.target_date,
       question: m.question,
       ageHours: hoursOld,
-      entries,
-      latestEntryTime: entries[0].txTime,
+      entries, latestEntryTime: entries[0].txTime,
       maxMovePct: Math.max(...entries.map((e) => e.movePct)),
     };
 
